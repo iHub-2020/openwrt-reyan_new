@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016-2017 Jian Chang <aa65535@live.com>
+# Copyright (C) 2025-2026 Reyanmatic <yanmaticyan@gmail.com>
 #
 # This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.
@@ -13,7 +13,7 @@ PKG_RELEASE:=4
 
 PKG_LICENSE:=GPLv3
 PKG_LICENSE_FILES:=LICENSE
-PKG_MAINTAINER:=Jian Chang <aa65535@live.com>
+PKG_MAINTAINER:=Reyanmatic <yanmaticyan@gmail.com>
 
 include $(INCLUDE_DIR)/package.mk
 
