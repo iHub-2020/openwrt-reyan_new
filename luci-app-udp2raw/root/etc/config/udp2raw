@@ -1,0 +1,75 @@
+# Copyright (C) 2024 iHub-2020
+#
+# This is free software, licensed under the MIT License.
+#
+# Project: LuCI Support for udp2raw
+# Description: Web interface for udp2raw tunnel configuration
+# Version: 1.0.1
+# Last Updated: 2026-01-09
+# Depends: udp2raw (>= 20230206.0)
+
+# ============================================================
+# Global Settings
+# ============================================================
+config general 'general'
+	option enabled '0'
+	# OpenWrt 关键安全选项（强制启用）
+	option keep_rule '1'
+	option wait_lock '1'
+	option retry_on_error '1'
+	# 日志级别: 0=never, 1=fatal, 2=error, 3=warn, 4=info, 5=debug, 6=trace
+	option log_level '4'
+
+# ============================================================
+# Tunnel Instance Example - Client Mode
+# (OpenWrt connects to Remote VPS Server)
+# 
+# 典型场景：OpenWrt 路由器上的 WireGuard 客户端通过 udp2raw 
+# 连接到远程 VPS 上的 WireGuard 服务端
+# ============================================================
+config tunnel 'wg_client'
+	option disabled '1'
+	option alias 'WireGuard Client Tunnel'
+	option mode 'client'
+	# 本地监听地址（WireGuard 客户端连接此地址）
+	option local_addr '127.0.0.1'
+	option local_port '51820'
+	# 远程服务器地址（VPS 上运行的 udp2raw 服务端）
+	option remote_addr '203.0.113.1'
+	option remote_port '4096'
+	# 安全设置（必须与服务端一致）
+	option key 'ChangeThisToYourStrongPassword'
+	option raw_mode 'faketcp'
+	option cipher_mode 'aes128cbc'
+	option auth_mode 'hmac_sha1'
+	# 关键选项（防止系统崩溃）
+	option auto_rule '1'
+	option fix_gro '1'
+	option seq_mode '3'
+
+# ============================================================
+# Tunnel Instance Example - Server Mode
+# (OpenWrt waits for incoming connections)
+#
+# 典型场景：OpenWrt 路由器作为 WireGuard 服务端，
+# 远程客户端通过 udp2raw 连接进来
+# ============================================================
+config tunnel 'wg_server'
+	option disabled '1'
+	option alias 'WireGuard Server Tunnel'
+	option mode 'server'
+	# 本地监听地址（接收 udp2raw 客户端连接）
+	option local_addr '0.0.0.0'
+	option local_port '4096'
+	# 转发目标（本地 WireGuard 服务端）
+	option remote_addr '127.0.0.1'
+	option remote_port '51820'
+	# 安全设置（必须与客户端一致）
+	option key 'ChangeThisToYourStrongPassword'
+	option raw_mode 'faketcp'
+	option cipher_mode 'aes128cbc'
+	option auth_mode 'hmac_sha1'
+	# 关键选项
+	option auto_rule '1'
+	option fix_gro '1'
+	option seq_mode '3'

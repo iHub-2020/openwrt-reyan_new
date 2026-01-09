@@ -1,0 +1,245 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "udp2raw-tunnel"
+msgstr ""
+
+msgid "Udp2raw Tunnel Configuration"
+msgstr ""
+
+msgid "Udp2raw Tunnel Status"
+msgstr ""
+
+msgid "Global Settings"
+msgstr ""
+
+msgid "Enable Service"
+msgstr ""
+
+msgid "Master switch to enable/disable all udp2raw tunnels."
+msgstr ""
+
+msgid "Keep Iptables Rules"
+msgstr ""
+
+msgid "Wait for Iptables Lock"
+msgstr ""
+
+msgid "Retry on Error"
+msgstr ""
+
+msgid "Log Level"
+msgstr ""
+
+msgid "Tunnel Instances"
+msgstr ""
+
+msgid "Add new tunnel"
+msgstr ""
+
+msgid "Basic"
+msgstr ""
+
+msgid "Security"
+msgstr ""
+
+msgid "Advanced"
+msgstr ""
+
+msgid "Disable"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Mode"
+msgstr ""
+
+msgid "Client"
+msgstr ""
+
+msgid "Server"
+msgstr ""
+
+msgid "Local Address"
+msgstr ""
+
+msgid "Local Port"
+msgstr ""
+
+msgid "Remote Address"
+msgstr ""
+
+msgid "Remote Port"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Raw Mode"
+msgstr ""
+
+msgid "FakeTCP (Recommended)"
+msgstr ""
+
+msgid "UDP"
+msgstr ""
+
+msgid "ICMP"
+msgstr ""
+
+msgid "Easy-FakeTCP"
+msgstr ""
+
+msgid "Cipher Mode"
+msgstr ""
+
+msgid "AES-128-CBC (Recommended)"
+msgstr ""
+
+msgid "AES-128-CFB"
+msgstr ""
+
+msgid "XOR (Fast, Low Security)"
+msgstr ""
+
+msgid "None (Debug Only!)"
+msgstr ""
+
+msgid "Auth Mode"
+msgstr ""
+
+msgid "HMAC-SHA1 (Recommended)"
+msgstr ""
+
+msgid "MD5"
+msgstr ""
+
+msgid "CRC32 (Fast, Low Security)"
+msgstr ""
+
+msgid "Simple (Weak)"
+msgstr ""
+
+msgid "Auto Iptables Rule"
+msgstr ""
+
+msgid "Disable Anti-Replay"
+msgstr ""
+
+msgid "Force Source IP"
+msgstr ""
+
+msgid "Force Source Port"
+msgstr ""
+
+msgid "Sequence Mode"
+msgstr ""
+
+msgid "Fix GRO Issues"
+msgstr ""
+
+msgid "Link-Level Mode"
+msgstr ""
+
+msgid "Bind Device"
+msgstr ""
+
+msgid "MTU Warning Threshold"
+msgstr ""
+
+msgid "Socket Buffer Size"
+msgstr ""
+
+msgid "Force Socket Buffer"
+msgstr ""
+
+msgid "Extra Arguments"
+msgstr ""
+
+msgid "Service Status:"
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Service Disabled"
+msgstr ""
+
+msgid "Disabled"
+msgstr ""
+
+msgid "Binary Not Found"
+msgstr ""
+
+msgid "tunnels"
+msgstr ""
+
+msgid "Tunnel Status"
+msgstr ""
+
+msgid "System Diagnostics"
+msgstr ""
+
+msgid "Binary Status:"
+msgstr ""
+
+msgid "Installed"
+msgstr ""
+
+msgid "Not found at /usr/bin/udp2raw"
+msgstr ""
+
+msgid "Iptables Rules:"
+msgstr ""
+
+msgid "Rules detected (RST blocking active)"
+msgstr ""
+
+msgid "No rules detected - will be added when tunnel starts"
+msgstr ""
+
+msgid "Safety Tips:"
+msgstr ""
+
+msgid "Recent Logs"
+msgstr ""
+
+msgid "Scroll to Bottom"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "WireGuard Integration Guide"
+msgstr ""
+
+msgid "Critical Safety Information"
+msgstr ""
+
+msgid "No tunnels configured. Go to Configuration tab to add one."
+msgstr ""
+
+msgid "Port is required"
+msgstr ""
+
+msgid "Port must be between 1 and 65535"
+msgstr ""
+
+msgid "Password must be at least 8 characters"
+msgstr ""
+
+msgid "This is a weak password! Please use a strong random password."
+msgstr ""
+
+msgid "Invalid IP address or hostname format"
+msgstr ""
+
+msgid "Invalid IPv4 address"
+msgstr ""
+
+msgid "Udp2raw Not Installed"
+msgstr ""
