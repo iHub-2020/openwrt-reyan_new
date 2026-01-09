@@ -103,5 +103,6 @@ Based on original work by sensec
 Upgraded by: Reyanmatic <yanmaticyan@gmail.com>
 
 ## Links
-Original project: https://github.com/sensec/luci-app-udp2raw
-udp2raw: https://github.com/wangyu-/udp2raw
+- Original project: https://github.com/sensec/luci-app-udp2raw
+- udp2raw: https://github.com/wangyu-/udp2raw
+
