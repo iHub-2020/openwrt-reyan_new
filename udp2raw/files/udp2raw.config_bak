@@ -1,0 +1,61 @@
+# udp2raw default configuration
+# Copyright (C) 2024 iHub-2020
+#
+# See: https://github.com/wangyu-/udp2raw
+#
+# Configuration Types:
+#   config general 'general'  - Global settings (注意：使用 'general' 与 LuCI 匹配)
+#   config tunnel 'xxx'       - Tunnel instance (client or server)
+#
+# IMPORTANT: The following parameters MUST match on both client and server:
+#   - raw_mode (faketcp/udp/icmp)
+#   - key (encryption key)  
+#   - cipher_mode (aes128cbc/xor/none)
+#   - auth_mode (hmac_sha1/md5/crc32/simple/none)
+#
+# Version: 1.1.0
+# Last Updated: 2026-01-10
+
+# Global settings (注意：section 名必须是 'general'，与 LuCI config.js 匹配)
+config general 'general'
+	# Master switch: 0=disabled, 1=enabled
+	option enabled '0'
+	# Log level: 0=never, 1=fatal, 2=error, 3=warn, 4=info, 5=debug, 6=trace
+	option log_level '4'
+	# OpenWrt safety options (applied to all tunnels)
+	option keep_rule '1'
+	option wait_lock '1'
+	option retry_on_error '1'
+
+# Example: WireGuard client tunnel (disabled by default)
+# Uncomment and modify for your setup
+#config tunnel 'wg_client'
+#	option disabled '0'
+#	option alias 'WireGuard Client'
+#	option mode 'client'
+#	option remote_addr '203.0.113.1'
+#	option remote_port '7777'
+#	option local_addr '127.0.0.1'
+#	option local_port '6666'
+#	option key 'your-secret-key-here'
+#	option raw_mode 'faketcp'
+#	option cipher_mode 'aes128cbc'
+#	option auth_mode 'hmac_sha1'
+#	option auto_rule '1'
+#	option seq_mode '3'
+
+# Example: Server mode tunnel (for VPS)
+#config tunnel 'wg_server'
+#	option disabled '0'
+#	option alias 'WireGuard Server'
+#	option mode 'server'
+#	option local_addr '0.0.0.0'
+#	option local_port '7777'
+#	option remote_addr '127.0.0.1'
+#	option remote_port '51820'
+#	option key 'your-secret-key-here'
+#	option raw_mode 'faketcp'
+#	option cipher_mode 'aes128cbc'
+#	option auth_mode 'hmac_sha1'
+#	option auto_rule '1'
+#	option seq_mode '3'
