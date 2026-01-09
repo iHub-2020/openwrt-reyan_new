@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@udp2raw[-1]
+	add ucitrack udp2raw
+	set ucitrack.@udp2raw[-1].init=udp2raw
+	commit ucitrack
+EOF
+
+rm -f /tmp/luci-indexcache
+exit 0
