@@ -55,7 +55,7 @@ Method 2: Compile from source
 See "Build Instructions" below.
 ```
 #### Build Instructions
-#####　Prerequisites
+Prerequisites
 ```bash
 # Install dependencies on Debian/Ubuntu
 sudo apt update
@@ -63,7 +63,7 @@ sudo apt install -y build-essential clang flex bison g++ gawk \
   gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
   python3-distutils rsync unzip zlib1g-dev file wget
 ```
-#####　Compile Steps
+Compile Steps
 ```bash
 # 1. Download OpenWrt SDK
 cd ~
@@ -206,3 +206,4 @@ GPL-3.0-only
 - udp2raw: https://github.com/wangyu-/udp2raw
 
 - udp2raw wiki: https://github.com/wangyu-/udp2raw/wiki
+
