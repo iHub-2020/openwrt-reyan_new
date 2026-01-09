@@ -1,75 +1,99 @@
 #!/bin/sh /etc/rc.common
+#
+# Copyright (C) 2026 Reyanmatic
+# Init script for udp2raw
+#
 
-START=99
+START=90
 STOP=10
-
 USE_PROCD=1
+
 PROG=/usr/bin/udp2raw
 
-validate_section_udp2raw() {
-	uci_load_validate udp2raw udp2raw "$1" "$2" \
-		'enabled:bool:0'
+start_service() {
+	local enabled daemon_user
+	
+	config_load udp2raw
+	config_get enabled general enabled 0
+	[ "$enabled" = "1" ] || return 0
+	
+	config_get daemon_user general daemon_user "root"
+	config_foreach start_tunnel tunnel
 }
 
-udp2raw_instance() {
+start_tunnel() {
 	local section="$1"
-	local enabled alias server_addr server_port local_addr local_port
-	local raw_mode key cipher_mode auth_mode auto_rule keep_rule seq_mode
-	local other_args
-
-	config_get_bool enabled "$section" "enabled" "0"
-	[ "$enabled" = "0" ] && return 1
-
-	config_get alias "$section" "alias"
-	config_get server_addr "$section" "server_addr"
-	config_get server_port "$section" "server_port"
-	config_get local_addr "$section" "local_addr" "0.0.0.0"
-	config_get local_port "$section" "local_port"
-	config_get raw_mode "$section" "raw_mode" "faketcp"
-	config_get key "$section" "key"
-	config_get cipher_mode "$section" "cipher_mode" "aes128cbc"
-	config_get auth_mode "$section" "auth_mode" "md5"
-	config_get_bool auto_rule "$section" "auto_rule" "1"
-	config_get_bool keep_rule "$section" "keep_rule" "0"
-	config_get seq_mode "$section" "seq_mode" "1"
-	config_list_foreach "$section" "other_args" append_arg
-
-	[ -z "$server_addr" -o -z "$server_port" -o -z "$local_port" ] && return 1
-
-	procd_open_instance
+	local mode local_addr local_port remote_addr remote_port
+	local raw_mode key cipher_mode auth_mode
+	local auto_rule keep_rule seq_mode lower_level
+	local source_ip source_port log_level extra_options
+	
+	config_get mode "$section" mode
+	config_get local_addr "$section" local_addr
+	config_get local_port "$section" local_port
+	config_get remote_addr "$section" remote_addr
+	config_get remote_port "$section" remote_port
+	config_get raw_mode "$section" raw_mode "faketcp"
+	config_get key "$section" key "secret"
+	config_get cipher_mode "$section" cipher_mode "aes128cbc"
+	config_get auth_mode "$section" auth_mode "md5"
+	config_get_bool auto_rule "$section" auto_rule 1
+	config_get_bool keep_rule "$section" keep_rule 0
+	config_get seq_mode "$section" seq_mode "3"
+	config_get lower_level "$section" lower_level
+	config_get source_ip "$section" source_ip
+	config_get source_port "$section" source_port
+	config_get log_level "$section" log_level "4"
+	config_get extra_options "$section" extra_options
+	
+	# 验证必填项
+	[ -z "$mode" -o -z "$local_addr" -o -z "$local_port" ] && return 1
+	[ -z "$remote_addr" -o -z "$remote_port" ] && return 1
+	
+	procd_open_instance "$section"
 	procd_set_param command $PROG
-	procd_append_param command -s -l "${local_addr}:${local_port}" -r "${server_addr}:${server_port}"
+	
+	# 模式
+	case "$mode" in
+		client) procd_append_param command -c ;;
+		server) procd_append_param command -s ;;
+		*) return 1 ;;
+	esac
+	
+	# 地址
+	procd_append_param command -l "${local_addr}:${local_port}"
+	procd_append_param command -r "${remote_addr}:${remote_port}"
+	
+	# 核心参数
+	procd_append_param command -k "$key"
 	procd_append_param command --raw-mode "$raw_mode"
-	[ -n "$key" ] && procd_append_param command -k "$key"
 	procd_append_param command --cipher-mode "$cipher_mode"
 	procd_append_param command --auth-mode "$auth_mode"
+	
+	# iptables 规则
 	[ "$auto_rule" = "1" ] && procd_append_param command -a
 	[ "$keep_rule" = "1" ] && procd_append_param command --keep-rule
-	procd_append_param command --seq-mode "$seq_mode"
-	[ -n "$other_args" ] && procd_append_param command $other_args
+	
+	# 高级选项
+	[ -n "$seq_mode" ] && procd_append_param command --seq-mode "$seq_mode"
+	[ -n "$lower_level" ] && procd_append_param command --lower-level "$lower_level"
+	[ -n "$source_ip" ] && procd_append_param command --source-ip "$source_ip"
+	[ -n "$source_port" ] && procd_append_param command --source-port "$source_port"
+	[ -n "$log_level" ] && procd_append_param command --log-level "$log_level"
+	
+	# 额外参数
+	for opt in $extra_options; do
+		procd_append_param command $opt
+	done
+	
 	procd_set_param respawn
 	procd_set_param stdout 1
 	procd_set_param stderr 1
+	procd_set_param user "${daemon_user}"
+	
 	procd_close_instance
-}
-
-append_arg() {
-	local cfg="$1"
-	other_args="$other_args $cfg"
-}
-
-start_service() {
-	config_load udp2raw
-	config_foreach udp2raw_instance servers
-	config_foreach udp2raw_instance clients
 }
 
 service_triggers() {
 	procd_add_reload_trigger "udp2raw"
-	procd_add_validation validate_section_udp2raw
-}
-
-reload_service() {
-	stop
-	start
 }
