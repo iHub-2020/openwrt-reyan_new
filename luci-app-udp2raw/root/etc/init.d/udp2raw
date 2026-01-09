@@ -1,99 +1,211 @@
 #!/bin/sh /etc/rc.common
+# Copyright (C) 2024 iHub-2020
 #
-# Copyright (C) 2026 Reyanmatic
-# Init script for udp2raw
+# OpenWrt init script for udp2raw tunnels
+# Supports multiple tunnel instances with proper error handling
+# and iptables rule management
 #
+# Version: 1.0.0
+# Last Updated: 2026-01-09
 
 START=90
 STOP=10
-USE_PROCD=1
 
+USE_PROCD=1
 PROG=/usr/bin/udp2raw
+NAME=udp2raw
+
+# 日志函数
+log_info() {
+    logger -t "$NAME" -p daemon.info "$1"
+}
+
+log_error() {
+    logger -t "$NAME" -p daemon.err "$1"
+}
+
+# 检查依赖
+validate_environment() {
+    # 检查可执行文件
+    [ -x "$PROG" ] || {
+        log_error "udp2raw binary not found or not executable"
+        return 1
+    }
+    
+    # 检查内核模块（raw socket 支持）
+    if ! grep -q "raw_sendmsg" /proc/kallsyms 2>/dev/null; then
+        log_error "Raw socket support not available in kernel"
+        return 1
+    }
+    
+    # 检查 iptables
+    which iptables >/dev/null 2>&1 || {
+        log_error "iptables not found - required for FakeTCP mode"
+        return 1
+    }
+    
+    return 0
+}
+
+# 解析通用选项
+parse_general_config() {
+    config_get_bool enabled "$1" enabled 0
+    config_get_bool keep_rule "$1" keep_rule 1
+    config_get_bool retry_on_error "$1" retry_on_error 1
+    config_get log_level "$1" log_level "4"
+    config_get_bool wait_lock "$1" wait_lock 1
+}
+
+# 启动单个隧道实例
+start_tunnel() {
+    local section="$1"
+    local disabled mode alias
+    
+    config_get_bool disabled "$section" disabled 0
+    [ "$disabled" = "1" ] && return 0
+    
+    config_get mode "$section" mode
+    config_get alias "$section" alias "$section"
+    
+    [ -z "$mode" ] && {
+        log_error "[$alias] Mode not specified, skipping"
+        return 1
+    }
+    
+    # 构建参数
+    local args=""
+    local local_addr local_port remote_addr remote_port
+    
+    config_get local_addr "$section" local_addr
+    config_get local_port "$section" local_port
+    config_get remote_addr "$section" remote_addr
+    config_get remote_port "$section" remote_port
+    
+    # 验证必需参数
+    [ -z "$local_port" -o -z "$remote_addr" -o -z "$remote_port" ] && {
+        log_error "[$alias] Missing required parameters"
+        return 1
+    }
+    
+    [ -z "$local_addr" ] && local_addr="0.0.0.0"
+    
+    # 模式参数
+    if [ "$mode" = "client" ]; then
+        args="$args -c"
+    elif [ "$mode" = "server" ]; then
+        args="$args -s"
+    else
+        log_error "[$alias] Invalid mode: $mode"
+        return 1
+    fi
+    
+    # 地址和端口
+    args="$args -l ${local_addr}:${local_port}"
+    args="$args -r ${remote_addr}:${remote_port}"
+    
+    # 密钥（必需）
+    local key
+    config_get key "$section" key
+    [ -n "$key" ] && args="$args -k \"$key\"" || {
+        log_error "[$alias] Password is required"
+        return 1
+    }
+    
+    # Raw 模式
+    local raw_mode
+    config_get raw_mode "$section" raw_mode "faketcp"
+    args="$args --raw-mode $raw_mode"
+    
+    # 加密模式
+    local cipher_mode
+    config_get cipher_mode "$section" cipher_mode "aes128cbc"
+    args="$args --cipher-mode $cipher_mode"
+    
+    # 认证模式
+    local auth_mode
+    config_get auth_mode "$section" auth_mode "hmac_sha1"
+    args="$args --auth-mode $auth_mode"
+    
+    # iptables 规则管理（关键！）
+    local auto_rule
+    config_get_bool auto_rule "$section" auto_rule 1
+    [ "$auto_rule" = "1" ] && args="$args -a"
+    
+    # 全局 keep-rule 选项（OpenWrt 环境强烈推荐）
+    [ "$keep_rule" = "1" ] && args="$args --keep-rule"
+    
+    # 其他选项
+    local source_ip source_port seq_mode lower_level disable_anti_replay fix_gro
+    
+    config_get source_ip "$section" source_ip
+    [ -n "$source_ip" ] && args="$args --source-ip $source_ip"
+    
+    config_get source_port "$section" source_port
+    [ -n "$source_port" ] && args="$args --source-port $source_port"
+    
+    config_get seq_mode "$section" seq_mode
+    [ -n "$seq_mode" ] && args="$args --seq-mode $seq_mode"
+    
+    config_get lower_level "$section" lower_level
+    [ -n "$lower_level" ] && args="$args --lower-level $lower_level"
+    
+    config_get_bool disable_anti_replay "$section" disable_anti_replay 0
+    [ "$disable_anti_replay" = "1" ] && args="$args --disable-anti-replay"
+    
+    config_get_bool fix_gro "$section" fix_gro 0
+    [ "$fix_gro" = "1" ] && args="$args --fix-gro"
+    
+    # 日志级别
+    args="$args --log-level $log_level"
+    
+    # wait-lock（推荐）
+    [ "$wait_lock" = "1" ] && args="$args --wait-lock"
+    
+    # retry-on-error
+    [ "$retry_on_error" = "1" ] && args="$args --retry-on-error"
+    
+    log_info "Starting tunnel: $alias ($mode mode)"
+    
+    # 使用 procd 管理进程
+    procd_open_instance "$section"
+    procd_set_param command /bin/sh -c "$PROG $args"
+    procd_set_param respawn 3600 5 0
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param pidfile "/var/run/udp2raw-$section.pid"
+    procd_close_instance
+}
+
+# 服务启动
+service_triggers() {
+    procd_add_reload_trigger "udp2raw"
+}
 
 start_service() {
-	local enabled daemon_user
-	
-	config_load udp2raw
-	config_get enabled general enabled 0
-	[ "$enabled" = "1" ] || return 0
-	
-	config_get daemon_user general daemon_user "root"
-	config_foreach start_tunnel tunnel
+    validate_environment || return 1
+    
+    config_load udp2raw
+    
+    local enabled
+    config_get_bool enabled general enabled 0
+    
+    [ "$enabled" = "0" ] && {
+        log_info "Service is disabled in config"
+        return 0
+    }
+    
+    parse_general_config general
+    
+    config_foreach start_tunnel tunnel
 }
 
-start_tunnel() {
-	local section="$1"
-	local mode local_addr local_port remote_addr remote_port
-	local raw_mode key cipher_mode auth_mode
-	local auto_rule keep_rule seq_mode lower_level
-	local source_ip source_port log_level extra_options
-	
-	config_get mode "$section" mode
-	config_get local_addr "$section" local_addr
-	config_get local_port "$section" local_port
-	config_get remote_addr "$section" remote_addr
-	config_get remote_port "$section" remote_port
-	config_get raw_mode "$section" raw_mode "faketcp"
-	config_get key "$section" key "secret"
-	config_get cipher_mode "$section" cipher_mode "aes128cbc"
-	config_get auth_mode "$section" auth_mode "md5"
-	config_get_bool auto_rule "$section" auto_rule 1
-	config_get_bool keep_rule "$section" keep_rule 0
-	config_get seq_mode "$section" seq_mode "3"
-	config_get lower_level "$section" lower_level
-	config_get source_ip "$section" source_ip
-	config_get source_port "$section" source_port
-	config_get log_level "$section" log_level "4"
-	config_get extra_options "$section" extra_options
-	
-	# 验证必填项
-	[ -z "$mode" -o -z "$local_addr" -o -z "$local_port" ] && return 1
-	[ -z "$remote_addr" -o -z "$remote_port" ] && return 1
-	
-	procd_open_instance "$section"
-	procd_set_param command $PROG
-	
-	# 模式
-	case "$mode" in
-		client) procd_append_param command -c ;;
-		server) procd_append_param command -s ;;
-		*) return 1 ;;
-	esac
-	
-	# 地址
-	procd_append_param command -l "${local_addr}:${local_port}"
-	procd_append_param command -r "${remote_addr}:${remote_port}"
-	
-	# 核心参数
-	procd_append_param command -k "$key"
-	procd_append_param command --raw-mode "$raw_mode"
-	procd_append_param command --cipher-mode "$cipher_mode"
-	procd_append_param command --auth-mode "$auth_mode"
-	
-	# iptables 规则
-	[ "$auto_rule" = "1" ] && procd_append_param command -a
-	[ "$keep_rule" = "1" ] && procd_append_param command --keep-rule
-	
-	# 高级选项
-	[ -n "$seq_mode" ] && procd_append_param command --seq-mode "$seq_mode"
-	[ -n "$lower_level" ] && procd_append_param command --lower-level "$lower_level"
-	[ -n "$source_ip" ] && procd_append_param command --source-ip "$source_ip"
-	[ -n "$source_port" ] && procd_append_param command --source-port "$source_port"
-	[ -n "$log_level" ] && procd_append_param command --log-level "$log_level"
-	
-	# 额外参数
-	for opt in $extra_options; do
-		procd_append_param command $opt
-	done
-	
-	procd_set_param respawn
-	procd_set_param stdout 1
-	procd_set_param stderr 1
-	procd_set_param user "${daemon_user}"
-	
-	procd_close_instance
+stop_service() {
+    log_info "Stopping all udp2raw tunnels"
+    # procd 会自动停止所有实例
 }
 
-service_triggers() {
-	procd_add_reload_trigger "udp2raw"
+reload_service() {
+    log_info "Reloading udp2raw configuration"
+    stop
+    start
 }
