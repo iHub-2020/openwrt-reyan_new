@@ -1,10 +1,21 @@
+/**
+ * Copyright (C) 2024 iHub-2020
+ * 
+ * LuCI Udp2raw Status Page
+ * Displays real-time tunnel status, connection info, and diagnostics
+ * 
+ * @module luci-app-udp2raw/status
+ * @version 1.0.0
+ * @date 2026-01-09
+ */
+
 'use strict';
 'require view';
-'require poll';
-'require rpc';
-'require uci';
 'require fs';
 'require ui';
+'require poll';
+'require uci';
+'require rpc';
 
 var callServiceList = rpc.declare({
 	object: 'service',
@@ -13,223 +24,276 @@ var callServiceList = rpc.declare({
 	expect: { '': {} }
 });
 
-var callInitAction = rpc.declare({
-	object: 'luci',
-	method: 'setInitAction',
-	params: ['name', 'action'],
-	expect: { result: false }
-});
-
 return view.extend({
+	title: _('Udp2raw Tunnel Status'),
+	
+	/**
+	 * 获取进程运行状态
+	 */
+	getServiceStatus: function() {
+		return L.resolveDefault(callServiceList('udp2raw'), {}).then(function(res) {
+			var isRunning = false;
+			var instances = [];
+			
+			try {
+				if (res.udp2raw && res.udp2raw.instances) {
+					for (var key in res.udp2raw.instances) {
+						var inst = res.udp2raw.instances[key];
+						if (inst.running) {
+							isRunning = true;
+							instances.push({
+								name: key,
+								pid: inst.pid || 'N/A',
+								command: inst.command ? inst.command.join(' ') : 'N/A'
+							});
+						}
+					}
+				}
+			} catch (e) {
+				console.error('Error parsing service status:', e);
+			}
+			
+			return {
+				running: isRunning,
+				instances: instances
+			};
+		});
+	},
+	
+	/**
+	 * 获取配置的隧道列表
+	 */
+	getTunnelConfigs: function() {
+		return uci.load('udp2raw').then(function() {
+			var tunnels = [];
+			uci.sections('udp2raw', 'tunnel', function(s) {
+				tunnels.push({
+					id: s['.name'],
+					alias: s.alias || s['.name'],
+					mode: s.mode || 'unknown',
+					disabled: s.disabled === '1',
+					local: (s.local_addr || '0.0.0.0') + ':' + (s.local_port || '?'),
+					remote: (s.remote_addr || '?') + ':' + (s.remote_port || '?'),
+					raw_mode: s.raw_mode || 'faketcp',
+					cipher: s.cipher_mode || 'aes128cbc',
+					auth: s.auth_mode || 'hmac_sha1'
+				});
+			});
+			return tunnels;
+		});
+	},
+	
+	/**
+	 * 读取日志文件
+	 */
+	getRecentLogs: function() {
+		return L.resolveDefault(fs.exec('/usr/bin/logread', ['-e', 'udp2raw']), {})
+			.then(function(res) {
+				if (res.code === 0 && res.stdout) {
+					var lines = res.stdout.trim().split('\n').slice(-50);
+					return lines.filter(function(line) {
+						return line.length > 0;
+					});
+				}
+				return [];
+			});
+	},
+	
+	/**
+	 * 检查 iptables 规则
+	 */
+	checkIptablesRules: function() {
+		return L.resolveDefault(fs.exec('/usr/sbin/iptables', ['-L', '-n', '-v']), {})
+			.then(function(res) {
+				if (res.code === 0 && res.stdout) {
+					var hasUdp2rawRules = res.stdout.indexOf('udp2raw') !== -1 ||
+					                       res.stdout.indexOf('RST') !== -1;
+					return {
+						present: hasUdp2rawRules,
+						output: res.stdout.split('\n').slice(0, 20).join('\n')
+					};
+				}
+				return { present: false, output: 'Unable to check iptables' };
+			});
+	},
+	
+	/**
+	 * 渲染状态表格
+	 */
+	renderStatusTable: function(status, tunnels) {
+		var table = E('div', { 'class': 'table' }, [
+			E('div', { 'class': 'tr table-titles' }, [
+				E('div', { 'class': 'th' }, _('Tunnel Name')),
+				E('div', { 'class': 'th' }, _('Mode')),
+				E('div', { 'class': 'th' }, _('Status')),
+				E('div', { 'class': 'th' }, _('Local Address')),
+				E('div', { 'class': 'th' }, _('Remote Address')),
+				E('div', { 'class': 'th' }, _('Protocol')),
+				E('div', { 'class': 'th' }, _('PID'))
+			])
+		]);
+		
+		if (tunnels.length === 0) {
+			table.appendChild(E('div', { 'class': 'tr placeholder' }, [
+				E('div', { 'class': 'td', 'colspan': 7 }, 
+					E('em', {}, _('No tunnels configured')))
+			]));
+			return table;
+		}
+		
+		tunnels.forEach(function(t) {
+			var isRunning = false;
+			var pid = 'N/A';
+			
+			// 匹配运行中的实例
+			status.instances.forEach(function(inst) {
+				if (inst.name === t.id) {
+					isRunning = true;
+					pid = inst.pid;
+				}
+			});
+			
+			var statusBadge;
+			if (t.disabled) {
+				statusBadge = E('span', { 
+					'class': 'label',
+					'style': 'background-color: #999; color: white;'
+				}, _('Disabled'));
+			} else if (isRunning) {
+				statusBadge = E('span', { 
+					'class': 'label',
+					'style': 'background-color: #5cb85c; color: white;'
+				}, _('Running'));
+			} else {
+				statusBadge = E('span', { 
+					'class': 'label',
+					'style': 'background-color: #d9534f; color: white;'
+				}, _('Stopped'));
+			}
+			
+			table.appendChild(E('div', { 'class': 'tr' }, [
+				E('div', { 'class': 'td' }, t.alias),
+				E('div', { 'class': 'td' }, t.mode.toUpperCase()),
+				E('div', { 'class': 'td' }, statusBadge),
+				E('div', { 'class': 'td' }, E('code', {}, t.local)),
+				E('div', { 'class': 'td' }, E('code', {}, t.remote)),
+				E('div', { 'class': 'td' }, t.raw_mode + '/' + t.cipher),
+				E('div', { 'class': 'td' }, pid)
+			]));
+		});
+		
+		return table;
+	},
+	
+	/**
+	 * 渲染诊断信息
+	 */
+	renderDiagnostics: function(iptablesInfo) {
+		var diagnostics = E('div', { 'class': 'cbi-section' }, [
+			E('h3', {}, _('System Diagnostics')),
+			E('div', { 'class': 'cbi-value' }, [
+				E('label', { 'class': 'cbi-value-title' }, _('Iptables Rules Status:')),
+				E('div', { 'class': 'cbi-value-field' }, [
+					iptablesInfo.present 
+						? E('span', { 'style': 'color: green;' }, '✓ ' + _('Rules detected'))
+						: E('span', { 'style': 'color: red;' }, '✗ ' + _('No rules found - tunnels may not work!'))
+				])
+			]),
+			E('div', { 'class': 'cbi-value' }, [
+				E('label', { 'class': 'cbi-value-title' }, _('⚠️ Important:')),
+				E('div', { 'class': 'cbi-value-field' }, [
+					E('ul', {}, [
+						E('li', {}, _('FakeTCP mode requires iptables rules to block kernel TCP processing')),
+						E('li', {}, _('Enable "Auto Rule" (-a) or "Keep Rule" (--keep-rule) in tunnel config')),
+						E('li', {}, _('On OpenWrt, rules may be cleared when network settings change')),
+						E('li', {}, _('Use "--keep-rule" option to auto-restore rules'))
+					])
+				])
+			])
+		]);
+		
+		return diagnostics;
+	},
+	
+	/**
+	 * 渲染日志区域
+	 */
+	renderLogs: function(logs) {
+		return E('div', { 'class': 'cbi-section' }, [
+			E('h3', {}, _('Recent Logs (last 50 lines)')),
+			E('div', { 'class': 'cbi-value-field' }, [
+				E('textarea', {
+					'readonly': 'readonly',
+					'style': 'width: 100%; height: 300px; font-family: monospace; font-size: 12px;',
+					'wrap': 'off'
+				}, logs.join('\n') || _('No logs available'))
+			])
+		]);
+	},
+	
+	/**
+	 * 主渲染函数
+	 */
 	load: function() {
 		return Promise.all([
-			uci.load('udp2raw'),
-			callServiceList('udp2raw'),
-			L.resolveDefault(fs.exec('/usr/bin/pgrep', ['-f', 'udp2raw']), null)
+			this.getServiceStatus(),
+			this.getTunnelConfigs(),
+			this.checkIptablesRules(),
+			this.getRecentLogs()
 		]);
 	},
-
+	
 	render: function(data) {
-		var serviceData = data[1];
-		var pids = data[2] && data[2].stdout ? data[2].stdout.trim().split('\n').filter(function(p) { return p; }) : [];
+		var status = data[0];
+		var tunnels = data[1];
+		var iptablesInfo = data[2];
+		var logs = data[3];
 		
-		var enabled = uci.get('udp2raw', 'general', 'enabled') || '0';
-		var instances = {};
-		var running = false;
-
-		// 解析服务实例
-		if (serviceData && serviceData.udp2raw && serviceData.udp2raw.instances) {
-			instances = serviceData.udp2raw.instances;
-			running = Object.keys(instances).some(function(key) {
-				return instances[key].running;
-			});
-		}
-
 		var view = E('div', { 'class': 'cbi-map' }, [
-			E('h2', {}, _('udp2raw Tunnel - Service Status')),
-			E('div', { 'class': 'cbi-map-descr' }, 
-				_('Real-time status of udp2raw tunnels and running processes')
-			)
-		]);
-
-		// === 全局控制 ===
-		var globalStatus = E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('Service Control')),
-			E('div', { 'class': 'cbi-section-node' }, [
-				E('div', { 'class': 'table' }, [
-					E('div', { 'class': 'tr' }, [
-						E('div', { 'class': 'td left', 'style': 'width: 33%' }, [
-							E('strong', {}, _('Service Enabled: ')),
-							enabled === '1' 
-								? E('span', { 'style': 'color: green' }, _('Yes'))
-								: E('span', { 'style': 'color: red' }, _('No'))
-						]),
-						E('div', { 'class': 'td left', 'style': 'width: 33%' }, [
-							E('strong', {}, _('Current Status: ')),
-							running 
-								? E('span', { 'style': 'color: green; font-weight: bold' }, '● ' + _('RUNNING'))
-								: E('span', { 'style': 'color: red; font-weight: bold' }, '● ' + _('STOPPED'))
-						]),
-						E('div', { 'class': 'td left', 'style': 'width: 33%' }, [
-							E('strong', {}, _('Running PIDs: ')),
-							pids.length > 0 
-								? E('span', {}, pids.join(', '))
-								: E('span', { 'style': 'color: gray' }, _('None'))
-						])
+			E('h2', {}, _('Udp2raw Tunnel Status')),
+			E('div', { 'class': 'cbi-section' }, [
+				E('div', { 'class': 'cbi-value' }, [
+					E('label', { 'class': 'cbi-value-title' }, _('Service Status:')),
+					E('div', { 'class': 'cbi-value-field' }, [
+						status.running 
+							? E('span', { 
+								'style': 'color: green; font-weight: bold;' 
+							}, '● ' + _('Running'))
+							: E('span', { 
+								'style': 'color: red; font-weight: bold;' 
+							}, '● ' + _('Stopped'))
 					])
 				]),
-				E('div', { 'class': 'cbi-page-actions', 'style': 'margin-top: 10px' }, [
-					E('button', {
-						'class': 'cbi-button cbi-button-positive',
-						'click': ui.createHandlerFn(this, function() {
-							return callInitAction('udp2raw', 'start').then(function() {
-								ui.addNotification(null, E('p', _('Starting udp2raw service...')), 'info');
-								window.location.reload();
-							});
-						})
-					}, _('Start')),
-					' ',
-					E('button', {
-						'class': 'cbi-button cbi-button-negative',
-						'click': ui.createHandlerFn(this, function() {
-							return callInitAction('udp2raw', 'stop').then(function() {
-								ui.addNotification(null, E('p', _('Stopping udp2raw service...')), 'info');
-								window.location.reload();
-							});
-						})
-					}, _('Stop')),
-					' ',
-					E('button', {
-						'class': 'cbi-button cbi-button-apply',
-						'click': ui.createHandlerFn(this, function() {
-							return callInitAction('udp2raw', 'restart').then(function() {
-								ui.addNotification(null, E('p', _('Restarting udp2raw service...')), 'info');
-								window.location.reload();
-							});
-						})
-					}, _('Restart'))
+				E('div', { 'class': 'cbi-value' }, [
+					E('label', { 'class': 'cbi-value-title' }, _('Active Tunnels:')),
+					E('div', { 'class': 'cbi-value-field' }, 
+						E('strong', {}, status.instances.length.toString()))
 				])
-			])
+			]),
+			
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Tunnel Status')),
+				this.renderStatusTable(status, tunnels)
+			]),
+			
+			this.renderDiagnostics(iptablesInfo),
+			this.renderLogs(logs)
 		]);
-
-		view.appendChild(globalStatus);
-
-		// === 隧道实例状态 ===
-		var tunnelSection = E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('Tunnel Instances'))
-		]);
-
-		var table = E('div', { 'class': 'table cbi-section-table' }, [
-			E('div', { 'class': 'tr table-titles' }, [
-				E('div', { 'class': 'th' }, _('Alias')),
-				E('div', { 'class': 'th' }, _('Mode')),
-				E('div', { 'class': 'th' }, _('Local')),
-				E('div', { 'class': 'th' }, _('Remote')),
-				E('div', { 'class': 'th' }, _('Raw Mode')),
-				E('div', { 'class': 'th center' }, _('Status')),
-				E('div', { 'class': 'th center' }, _('PID'))
-			])
-		]);
-
-		var sections = uci.sections('udp2raw', 'tunnel');
 		
-		if (sections.length === 0) {
-			table.appendChild(
-				E('div', { 'class': 'tr placeholder' }, [
-					E('div', { 'class': 'td' }, E('em', {}, _('No tunnel configured')))
-				])
-			);
-		} else {
-			sections.forEach(function(section) {
-				var sid = section['.name'];
-				var alias = section.alias || sid;
-				var mode = section.mode || '-';
-				var local = (section.local_addr || '?') + ':' + (section.local_port || '?');
-				var remote = (section.remote_addr || '?') + ':' + (section.remote_port || '?');
-				var rawMode = section.raw_mode || 'faketcp';
-				
-				var instance = instances[sid];
-				var isRunning = instance && instance.running;
-				var pid = isRunning && instance.pid ? instance.pid : '-';
-
-				table.appendChild(
-					E('div', { 'class': 'tr' }, [
-						E('div', { 'class': 'td', 'data-title': _('Alias') }, alias),
-						E('div', { 'class': 'td', 'data-title': _('Mode') }, 
-							mode === 'client' ? _('Client') : _('Server')
-						),
-						E('div', { 'class': 'td', 'data-title': _('Local') }, local),
-						E('div', { 'class': 'td', 'data-title': _('Remote') }, remote),
-						E('div', { 'class': 'td', 'data-title': _('Raw Mode') }, rawMode),
-						E('div', { 'class': 'td center', 'data-title': _('Status') }, 
-							isRunning 
-								? E('span', { 'style': 'color: green; font-weight: bold' }, '● ' + _('Running'))
-								: E('span', { 'style': 'color: gray' }, '○ ' + _('Stopped'))
-						),
-						E('div', { 'class': 'td center', 'data-title': _('PID') }, String(pid))
-					])
-				);
-			});
-		}
-
-		tunnelSection.appendChild(table);
-		view.appendChild(tunnelSection);
-
-		// === 进程详情 ===
-		if (pids.length > 0) {
-			var processSection = E('div', { 'class': 'cbi-section' }, [
-				E('h3', {}, _('Running Processes'))
-			]);
-
-			var processList = E('pre', { 'class': 'cbi-input-textarea', 'style': 'background: #f5f5f5; padding: 10px; overflow-x: auto' });
-
-			fs.exec('/bin/ps', ['w']).then(function(res) {
-				if (res.stdout) {
-					var lines = res.stdout.split('\n').filter(function(line) {
-						return pids.some(function(pid) {
-							return line.indexOf(pid) === 0 || line.indexOf(' ' + pid + ' ') > 0;
-						});
-					});
-					processList.textContent = lines.join('\n') || _('No matching processes found');
+		// 设置自动刷新（每5秒）
+		poll.add(L.bind(function() {
+			return this.load().then(L.bind(function(refreshData) {
+				var container = document.querySelector('.cbi-map');
+				if (container) {
+					var newView = this.render(refreshData);
+					container.parentNode.replaceChild(newView, container);
 				}
-			}).catch(function() {
-				processList.textContent = _('Unable to retrieve process information');
-			});
-
-			processSection.appendChild(processList);
-			view.appendChild(processSection);
-		}
-
-		// === 系统日志 ===
-		var logSection = E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('Recent Logs (last 50 lines)'))
-		]);
-
-		var logOutput = E('pre', { 
-			'class': 'cbi-input-textarea', 
-			'style': 'background: #000; color: #0f0; padding: 10px; overflow-x: auto; max-height: 400px; overflow-y: scroll',
-			'id': 'udp2raw_log'
-		}, _('Loading logs...'));
-
-		fs.exec('/sbin/logread', ['-e', 'udp2raw']).then(function(res) {
-			if (res.stdout && res.stdout.trim()) {
-				var lines = res.stdout.trim().split('\n');
-				logOutput.textContent = lines.slice(-50).join('\n');
-			} else {
-				logOutput.textContent = _('No udp2raw logs found');
-				logOutput.style.color = '#999';
-			}
-		}).catch(function() {
-			logOutput.textContent = _('Unable to retrieve logs');
-			logOutput.style.color = '#f00';
-		});
-
-		logSection.appendChild(logOutput);
-		view.appendChild(logSection);
-
+			}, this));
+		}, this), 5);
+		
 		return view;
 	},
-
+	
 	handleSaveApply: null,
 	handleSave: null,
 	handleReset: null
