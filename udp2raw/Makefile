@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# Copyright (c) 2026 reyanmatic <yanmaticyan@gmail.com>
+# Copyright (c) 2026 Reyanmatic <yanmaticyan@gmail.com>
 #
 # Updated by reyanmatic on 2026-01-09
 # - Synced with latest udp2raw unified branch (git 4623f878e0)
