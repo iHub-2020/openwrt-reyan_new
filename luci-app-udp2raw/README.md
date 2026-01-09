@@ -53,18 +53,18 @@ opkg install luci-app-udp2raw_*.ipk
 
 Method 2: Compile from source
 See "Build Instructions" below.
-
-Build Instructions
-Prerequisites
-bash
+```
+#### Build Instructions
+#####　Prerequisites
+```bash
 # Install dependencies on Debian/Ubuntu
 sudo apt update
 sudo apt install -y build-essential clang flex bison g++ gawk \
   gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
   python3-distutils rsync unzip zlib1g-dev file wget
-
-Compile Steps
-bash
+```
+#####　Compile Steps
+```bash
 # 1. Download OpenWrt SDK
 cd ~
 wget https://downloads.openwrt.org/releases/23.05.2/targets/x86/64/openwrt-sdk-23.05.2-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
@@ -88,8 +88,8 @@ make package/luci-app-udp2raw/compile V=s
 
 # 6. Find IPK
 ls bin/packages/*/luci/luci-app-udp2raw_*.ipk
-
-Dependencies
+```
+## Dependencies
 udp2raw - The binary package (must be installed separately or included in build)
 luci-base - LuCI core framework
 Usage
@@ -108,11 +108,11 @@ WireGuard Integration
 Typical Setup (OpenWrt as WireGuard Client)
 ┌─────────────────────────────────────────────────────────────────┐
 │                        OpenWrt Router                           │
-│  ┌──────────────┐     ┌──────────────┐                         │
-│  │  WireGuard   │────▶│   udp2raw    │────▶ Internet ────▶ VPS │
-│  │   Client     │ UDP │   Client     │ FakeTCP                 │
-│  │ 127.0.0.1:X  │     │ 127.0.0.1:Y  │                         │
-│  └──────────────┘     └──────────────┘                         │
+│  ┌──────────────┐     ┌──────────────┐                          │
+│  │  WireGuard   │────▶│   udp2raw    │────▶ Internet ────▶ VPS│
+│  │   Client     │ UDP │   Client     │ FakeTCP                  │
+│  │ 127.0.0.1:X  │     │ 127.0.0.1:Y  │                          │
+│  └──────────────┘     └──────────────┘                          │
 └─────────────────────────────────────────────────────────────────┘
 
 Configuration Steps
@@ -133,7 +133,7 @@ Run WireGuard server
 Important: Prevent Traffic Loop
 If routing all traffic (0.0.0.0/0) through VPN, add a route exception for the VPS IP:
 
-bash
+```bash
 ip route add <VPS_IP>/32 via <original_gateway>
 
 Migration from Old Version
@@ -155,8 +155,8 @@ opkg install luci-app-udp2raw_*.ipk
 Troubleshooting
 Service won't start
 Check if udp2raw binary exists:
-
-bash
+```
+```bash
 which udp2raw
 ls -la /usr/bin/udp2raw
 
@@ -166,24 +166,24 @@ bash
 uci show udp2raw
 
 Check system log:
-
-bash
+```
+```bash
 logread | grep udp2raw
 
 Connection unstable
 Ensure --keep-rule is enabled (default in this version)
 
 Check if iptables rules exist:
-
-bash
+```
+```bash
 iptables -L -n | grep -i udp2raw
 
 Try different raw_mode (faketcp/udp/icmp)
 
 iptables conflicts
 If using other firewall applications, ensure --wait-lock is enabled (default in this version) to prevent lock conflicts.
-
-Changelog
+```
+## Changelog
 v1.1.0 (2026-01-09)
 Added OpenWrt safety defaults (--keep-rule, --wait-lock, etc.)
 Fixed UCI config type consistency (unified to config tunnel)
@@ -192,16 +192,17 @@ Added binary existence check in status page
 Added WireGuard integration guide
 Full Chinese (Simplified) translation
 Improved validation and warning messages
-v1.0.0
+## v1.0.0
 Initial release with new LuCI JavaScript architecture
 Migrated from old CBI/Lua architecture
 License
 GPL-3.0-only
 
-Author
-Based on original work by sensec
-Upgraded by: iHub-2020
-Links
-Original project: https://github.com/sensec/luci-app-udp2raw
-udp2raw: https://github.com/wangyu-/udp2raw
-udp2raw wiki: https://github.com/wangyu-/udp2raw/wiki
+## Author
+- Based on original work by sensec
+- Upgraded by: iHub-2020
+## Links
+- Original project: https://github.com/sensec/luci-app-udp2raw
+- udp2raw: https://github.com/wangyu-/udp2raw
+
+- udp2raw wiki: https://github.com/wangyu-/udp2raw/wiki
