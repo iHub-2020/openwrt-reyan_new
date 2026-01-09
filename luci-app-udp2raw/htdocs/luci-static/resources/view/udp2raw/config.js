@@ -42,11 +42,15 @@ return view.extend({
 			});
 		}
 
-		o = s.option(form.DummyValue, '_status');
+		// 改为简单的提示：
+		s = m.section(form.NamedSection, '_hint', '');
+		o = s.option(form.DummyValue, '_hint');
 		o.cfgvalue = function() {
-			return running 
-				? '<span style="color:green; font-weight:bold">● ' + _('RUNNING') + '</span>'
-				: '<span style="color:red; font-weight:bold">● ' + _('STOPPED') + '</span>';
+			return E('p', { 'class': 'alert-message info' }, [
+				_('View real-time service status in the '),
+				E('a', { 'href': L.url('admin/services/udp2raw/status') }, _('Status')),
+				_(' tab.')
+			]);
 		};
 		o.rawhtml = true;
 
@@ -223,3 +227,4 @@ return view.extend({
 		]);
 	}
 });
+
