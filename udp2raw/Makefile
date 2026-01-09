@@ -2,10 +2,15 @@
 #
 # Copyright (c) 2026 Reyanmatic <yanmaticyan@gmail.com>
 #
-# Updated by reyanmatic on 2026-01-09
-# - Synced with latest udp2raw unified branch (git 4623f878e0)
-# - Updated build configuration for OpenWrt 23.05+
-# - Enhanced dependency management
+# Project: udp2raw OpenWrt Package
+# Created: 2026-01-09
+# Version: 20230206.0-r2
+# Author: Reyanmatic
+# Email: yanmaticyan@gmail.com
+#
+# Description:
+#   OpenWrt Makefile for udp2raw-tunnel
+#   Based on upstream: https://github.com/wangyu-/udp2raw (git 4623f878e0)
 
 include $(TOPDIR)/rules.mk
 
@@ -19,14 +24,9 @@ PKG_SOURCE_VERSION:=4623f878e0
 PKG_SOURCE_DATE:=2024-11-03
 PKG_MIRROR_HASH:=skip
 
-# 备用：使用 release tarball
-# PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-# PKG_SOURCE_URL:=https://codeload.github.com/wangyu-/udp2raw/tar.gz/$(PKG_VERSION)?
-# PKG_HASH:=1e459020654d3c65acb252a56fe11a5e2feec5a64d6e2ffd0aacc14213bbc9c0
-
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
-PKG_MAINTAINER:=reyanmatic <yanmaticyan@gmail.com>
+PKG_MAINTAINER:=Reyanmatic <yanmaticyan@gmail.com>
 
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=gc-sections lto
@@ -39,28 +39,24 @@ define Package/udp2raw
   SUBMENU:=VPN
   TITLE:=Tunnel UDP into Encrypted FakeTCP/UDP/ICMP Traffic
   URL:=https://github.com/wangyu-/udp2raw
-  DEPENDS:=+libstdcpp +libpthread +librt @!arc
+  DEPENDS:=+libstdcpp +libpthread +librt
   PROVIDES:=udp2raw-tunnel
 endef
 
 define Package/udp2raw/description
   udp2raw-tunnel turns UDP traffic into encrypted FakeTCP/UDP/ICMP traffic
   by using raw socket. It helps you bypass UDP blocking/QoS and unstable
-  UDP environment. Supports encryption (AES-128), anti-replay, connection
-  recovery and multiplexing.
+  UDP environment.
   
-  Updated Features (2024):
-  - Enhanced --fix-gro option for large packet handling
-  - Improved --retry-on-error for startup scripts
-  - Better cipher mode support (aes128cbc, aes128cfb)
-  - Connection stability improvements
+  Features:
+  - Encryption support (AES-128/AES-256)
+  - Anti-replay protection
+  - Connection recovery
+  - Multiple cipher modes (aes128cbc, aes128cfb, xor, none)
+  - Auth modes (md5, crc32, simple, none)
 endef
 
-define Package/udp2raw/conffiles
-/etc/config/udp2raw
-endef
-
-# 编译标志优化
+# 编译标志
 TARGET_CXXFLAGS += -std=c++11 -Wall -Wextra -Wno-unused-parameter
 TARGET_CXXFLAGS += -DNDEBUG -ffunction-sections -fdata-sections
 TARGET_LDFLAGS += -Wl,--gc-sections -lpthread -lrt
@@ -69,11 +65,11 @@ MAKE_FLAGS += cross
 
 define Build/Prepare
 	$(PKG_UNPACK)
-	# 修改 Makefile 指向正确的交叉编译器
+	# 修改原项目 makefile 以使用交叉编译器
 	$(SED) 's|cc_cross=.*|cc_cross=$(TARGET_CXX)|g' $(PKG_BUILD_DIR)/makefile
-	# 移除 git version 自动检测
+	# 移除 git version 检测（SDK 环境下不可用）
 	$(SED) '/\*gitversion/d' $(PKG_BUILD_DIR)/makefile
-	# 创建版本信息文件
+	# 手动创建版本信息
 	echo 'const char *gitversion = "$(PKG_VERSION)-openwrt-$(PKG_RELEASE) (git-$(PKG_SOURCE_VERSION))";' > $(PKG_BUILD_DIR)/git_version.h
 	$(Build/Patch)
 endef
@@ -88,21 +84,16 @@ endef
 define Package/udp2raw/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/udp2raw_cross $(1)/usr/bin/udp2raw
-	
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/udp2raw.config $(1)/etc/config/udp2raw
-	
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/udp2raw.init $(1)/etc/init.d/udp2raw
 endef
 
 define Package/udp2raw/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
 	echo "udp2raw installed successfully!"
-	echo "Configure via: /etc/config/udp2raw"
-	echo "Start service: /etc/init.d/udp2raw start"
-	echo "Enable on boot: /etc/init.d/udp2raw enable"
+	echo "Binary location: /usr/bin/udp2raw"
+	echo "Run 'udp2raw -h' for usage information"
+	echo ""
+	echo "Note: Install 'luci-app-udp2raw' for Web UI configuration"
 }
 exit 0
 endef
