@@ -1,101 +1,90 @@
-# SPDX-License-Identifier: MIT
-#
-# Copyright (c) 2026 Reyanmatic <yanmaticyan@gmail.com>
+# Copyright (C) 2024 iHub-2020
+# 
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
 #
 # Project: udp2raw OpenWrt Package
-# Created: 2026-01-09
-# Version: 20230206.0-r2
-# Author: Reyanmatic
-# Email: yanmaticyan@gmail.com
-#
-# Description:
-#   OpenWrt Makefile for udp2raw-tunnel
-#   Based on upstream: https://github.com/wangyu-/udp2raw (git 4623f878e0)
+# Maintainer: iHub-2020
+# Upstream: https://github.com/wangyu-/udp2raw
+# Version: 20230206.0 (Latest Stable Release)
+# Last Updated: 2026-01-09
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
 PKG_VERSION:=20230206.0
-PKG_RELEASE:=2
+PKG_RELEASE:=1
 
+# 使用官方 Release Tag
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/wangyu-/udp2raw.git
-PKG_SOURCE_VERSION:=4623f878e0
-PKG_SOURCE_DATE:=2024-11-03
-PKG_MIRROR_HASH:=skip
+PKG_SOURCE_VERSION:=20230206.0
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_LICENSE:=MIT
-PKG_LICENSE_FILES:=LICENSE
-PKG_MAINTAINER:=Reyanmatic <yanmaticyan@gmail.com>
+PKG_LICENSE_FILES:=LICENSE.md
+PKG_MAINTAINER:=iHub-2020
 
 PKG_BUILD_PARALLEL:=1
-PKG_BUILD_FLAGS:=gc-sections lto
+PKG_USE_MIPS16:=0
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/udp2raw
   SECTION:=net
   CATEGORY:=Network
-  SUBMENU:=VPN
-  TITLE:=Tunnel UDP into Encrypted FakeTCP/UDP/ICMP Traffic
+  TITLE:=UDP to FakeTCP/ICMP tunnel
   URL:=https://github.com/wangyu-/udp2raw
-  DEPENDS:=+libstdcpp +libpthread +librt
-  PROVIDES:=udp2raw-tunnel
+  DEPENDS:=+libstdcpp +libpthread +kmod-ipt-raw +iptables-mod-filter
 endef
 
 define Package/udp2raw/description
-  udp2raw-tunnel turns UDP traffic into encrypted FakeTCP/UDP/ICMP traffic
-  by using raw socket. It helps you bypass UDP blocking/QoS and unstable
-  UDP environment.
+  A tunnel which turns UDP traffic into encrypted FakeTCP/UDP/ICMP traffic 
+  by using raw socket. Helps you bypass UDP firewalls or unstable UDP 
+  environments. Supports OpenVPN, WireGuard and other UDP-based VPNs.
   
-  Features:
-  - Encryption support (AES-128/AES-256)
+  Key Features:
+  - Bypass UDP blocking/QoS with FakeTCP/ICMP headers
+  - AES-128-CBC encryption with HMAC-SHA1 authentication
+  - Connection recovery and failure detection
   - Anti-replay protection
-  - Connection recovery
-  - Multiple cipher modes (aes128cbc, aes128cfb, xor, none)
-  - Auth modes (md5, crc32, simple, none)
+  - Multiple clients support
+  
+  WARNING: Requires proper iptables rules to function correctly!
 endef
 
 # 编译标志
-TARGET_CXXFLAGS += -std=c++11 -Wall -Wextra -Wno-unused-parameter
-TARGET_CXXFLAGS += -DNDEBUG -ffunction-sections -fdata-sections
-TARGET_LDFLAGS += -Wl,--gc-sections -lpthread -lrt
-
 MAKE_FLAGS += cross
 
-define Build/Prepare
-	$(PKG_UNPACK)
-	# 修改原项目 makefile 以使用交叉编译器
-	$(SED) 's|cc_cross=.*|cc_cross=$(TARGET_CXX)|g' $(PKG_BUILD_DIR)/makefile
-	# 移除 git version 检测（SDK 环境下不可用）
-	$(SED) '/\*gitversion/d' $(PKG_BUILD_DIR)/makefile
-	# 手动创建版本信息
-	echo 'const char *gitversion = "$(PKG_VERSION)-openwrt-$(PKG_RELEASE) (git-$(PKG_SOURCE_VERSION))";' > $(PKG_BUILD_DIR)/git_version.h
-	$(Build/Patch)
-endef
+TARGET_CXXFLAGS += -std=c++11 -DNDEBUG
+TARGET_LDFLAGS += -lpthread
 
 define Build/Compile
 	$(MAKE) -C $(PKG_BUILD_DIR) \
-		$(MAKE_FLAGS) \
+		CXX="$(TARGET_CXX)" \
 		CXXFLAGS="$(TARGET_CXXFLAGS)" \
-		LDFLAGS="$(TARGET_LDFLAGS)"
+		LDFLAGS="$(TARGET_LDFLAGS)" \
+		cross
 endef
 
 define Package/udp2raw/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/udp2raw_cross $(1)/usr/bin/udp2raw
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/udp2raw $(1)/usr/bin/udp2raw
+	
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_CONF) ./files/udp2raw.config $(1)/etc/config/udp2raw
+	
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/udp2raw.init $(1)/etc/init.d/udp2raw
+	
+	$(INSTALL_DIR) $(1)/usr/share/udp2raw
+	$(INSTALL_DATA) ./files/udp2raw.upgrade $(1)/usr/share/udp2raw/
 endef
 
-define Package/udp2raw/postinst
-#!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
-	echo "udp2raw installed successfully!"
-	echo "Binary location: /usr/bin/udp2raw"
-	echo "Run 'udp2raw -h' for usage information"
-	echo ""
-	echo "Note: Install 'luci-app-udp2raw' for Web UI configuration"
-}
-exit 0
+define Package/udp2raw/conffiles
+/etc/config/udp2raw
 endef
 
 $(eval $(call BuildPackage,udp2raw))
