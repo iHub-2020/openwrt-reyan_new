@@ -1,0 +1,677 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: luci-app-udp-tunnel\n"
+"Language: zh_Hans\n"
+
+msgid "UDP Tunnel Manager"
+msgstr "UDP 隧道管理"
+
+msgid "UDP Tunnel Configuration"
+msgstr "UDP 隧道配置"
+
+msgid "UDP Tunnel Status"
+msgstr "UDP 隧道状态"
+
+msgid "UDP Tunnel - Edit Server Instance"
+msgstr "UDP 隧道 - 编辑服务端实例"
+
+msgid "UDP Tunnel - Edit Client Instance"
+msgstr "UDP 隧道 - 编辑客户端实例"
+
+msgid "Configuration"
+msgstr "配置"
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Global Settings"
+msgstr "全局设置"
+
+msgid "General Settings"
+msgstr "常规设置"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Enable Service"
+msgstr "启用服务"
+
+msgid "Master switch to enable/disable the UDP tunnel service."
+msgstr "主开关，启用或禁用 UDP 隧道服务。"
+
+msgid "Master switch to enable/disable all UDP tunnels."
+msgstr "主开关，启用或禁用所有 UDP 隧道。"
+
+msgid "Active Tunnels"
+msgstr "活动隧道"
+
+msgid "Select which tunnel instances to run. If empty, all enabled tunnels will run."
+msgstr "选择要运行的隧道实例。如果为空，将运行所有已启用的隧道。"
+
+msgid "These settings apply to all tunnel instances."
+msgstr "这些设置适用于所有隧道实例。"
+
+msgid "Keep Iptables Rules"
+msgstr "保持防火墙规则"
+
+msgid "Monitors and automatically restores iptables rules when cleared by system. Strongly recommended for OpenWrt."
+msgstr "监控并在系统清除规则时自动恢复 iptables 规则。强烈建议在 OpenWrt 上启用。"
+
+msgid "Wait for Iptables Lock"
+msgstr "等待 iptables 锁"
+
+msgid "Wait for iptables lock when adding rules. Requires iptables v1.4.20+."
+msgstr "添加规则时等待 iptables 锁。需要 iptables v1.4.20+。"
+
+msgid "Retry on Error"
+msgstr "出错时重试"
+
+msgid "Allow udp2raw to start before network is fully initialized."
+msgstr "允许 udp2raw 在网络完全初始化前启动。"
+
+msgid "Log Level"
+msgstr "日志级别"
+
+msgid "Verbosity of log output."
+msgstr "日志输出的详细程度。"
+
+msgid "Server Instances"
+msgstr "服务端实例"
+
+msgid "Server mode: Listen on a port and forward decrypted traffic to local service."
+msgstr "服务端模式：监听端口并将解密后的流量转发到本地服务。"
+
+msgid "Client Instances"
+msgstr "客户端实例"
+
+msgid "Client mode: Connect to remote server and forward local UDP traffic."
+msgstr "客户端模式：连接到远程服务器并转发本地 UDP 流量。"
+
+msgid "Tunnel Instances"
+msgstr "隧道实例"
+
+msgid "Add new tunnel"
+msgstr "添加新隧道"
+
+msgid "Add"
+msgstr "添加"
+
+msgid "Edit"
+msgstr "编辑"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Edit Server Instance"
+msgstr "编辑服务端实例"
+
+msgid "Edit Client Instance"
+msgstr "编辑客户端实例"
+
+msgid "Basic"
+msgstr "基本设置"
+
+msgid "Security"
+msgstr "安全设置"
+
+msgid "Advanced"
+msgstr "高级设置"
+
+msgid "Disable"
+msgstr "禁用"
+
+msgid "Temporarily disable this tunnel instance."
+msgstr "临时禁用此隧道实例。"
+
+msgid "Alias"
+msgstr "别名"
+
+msgid "A friendly name for this tunnel instance."
+msgstr "此隧道实例的友好名称。"
+
+msgid "Name"
+msgstr "名称"
+
+msgid "Mode"
+msgstr "模式"
+
+msgid "Client"
+msgstr "客户端"
+
+msgid "Server"
+msgstr "服务端"
+
+msgid "Listen Address"
+msgstr "监听地址"
+
+msgid "IP address to listen on. Use 0.0.0.0 for all interfaces."
+msgstr "要监听的 IP 地址。使用 0.0.0.0 表示所有接口。"
+
+msgid "Local IP address to listen on for UDP traffic to tunnel."
+msgstr "监听本地 UDP 流量的 IP 地址。"
+
+msgid "Local Address"
+msgstr "本地地址"
+
+msgid "Listen Port"
+msgstr "监听端口"
+
+msgid "Port to listen for incoming raw tunnel connections."
+msgstr "监听传入的原始隧道连接的端口。"
+
+msgid "Local port to listen for UDP traffic to tunnel."
+msgstr "监听本地 UDP 流量的端口。"
+
+msgid "Local Port"
+msgstr "本地端口"
+
+msgid "Forward to Address"
+msgstr "转发到地址"
+
+msgid "Local service address to forward decrypted UDP traffic."
+msgstr "转发解密后 UDP 流量的本地服务地址。"
+
+msgid "Forward to Port"
+msgstr "转发到端口"
+
+msgid "Local service port to forward decrypted UDP traffic."
+msgstr "转发解密后 UDP 流量的本地服务端口。"
+
+msgid "Remote Address"
+msgstr "远程地址"
+
+msgid "Remote Port"
+msgstr "远程端口"
+
+msgid "Remote Server Address"
+msgstr "远程服务器地址"
+
+msgid "IP address or hostname of the remote udp2raw server."
+msgstr "远程 udp2raw 服务器的 IP 地址或主机名。"
+
+msgid "Remote Server Port"
+msgstr "远程服务器端口"
+
+msgid "Port of the remote udp2raw server."
+msgstr "远程 udp2raw 服务器的端口。"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Encryption password. Must match on both client and server."
+msgstr "加密密码。必须在客户端和服务端保持一致。"
+
+msgid "Encryption password. Must match server configuration."
+msgstr "加密密码。必须与服务端配置一致。"
+
+msgid "Raw Mode"
+msgstr "传输模式"
+
+msgid "Transport protocol. FakeTCP is recommended for bypassing firewalls."
+msgstr "传输协议。推荐使用 FakeTCP 绕过防火墙。"
+
+msgid "Transport protocol. Must match server configuration."
+msgstr "传输协议。必须与服务端配置一致。"
+
+msgid "FakeTCP"
+msgstr "伪TCP"
+
+msgid "FakeTCP (Recommended)"
+msgstr "伪TCP（推荐）"
+
+msgid "UDP"
+msgstr "UDP"
+
+msgid "ICMP"
+msgstr "ICMP"
+
+msgid "Easy-FakeTCP"
+msgstr "简易伪TCP"
+
+msgid "Cipher Mode"
+msgstr "加密模式"
+
+msgid "Encryption algorithm. AES-128-CBC provides best security."
+msgstr "加密算法。AES-128-CBC 提供最佳安全性。"
+
+msgid "Encryption algorithm. Must match server configuration."
+msgstr "加密算法。必须与服务端配置一致。"
+
+msgid "AES-128-CBC"
+msgstr "AES-128-CBC"
+
+msgid "AES-128-CBC (Recommended)"
+msgstr "AES-128-CBC（推荐）"
+
+msgid "AES-128-CFB"
+msgstr "AES-128-CFB"
+
+msgid "XOR"
+msgstr "XOR"
+
+msgid "XOR (Fast, Low Security)"
+msgstr "XOR（快速，低安全性）"
+
+msgid "None"
+msgstr "无"
+
+msgid "None (Debug Only!)"
+msgstr "无（仅调试！）"
+
+msgid "Auth Mode"
+msgstr "认证模式"
+
+msgid "Authentication algorithm. HMAC-SHA1 provides best integrity protection."
+msgstr "认证算法。HMAC-SHA1 提供最佳完整性保护。"
+
+msgid "Authentication algorithm. Must match server configuration."
+msgstr "认证算法。必须与服务端配置一致。"
+
+msgid "HMAC-SHA1"
+msgstr "HMAC-SHA1"
+
+msgid "HMAC-SHA1 (Recommended)"
+msgstr "HMAC-SHA1（推荐）"
+
+msgid "MD5"
+msgstr "MD5"
+
+msgid "CRC32"
+msgstr "CRC32"
+
+msgid "CRC32 (Fast, Low Security)"
+msgstr "CRC32（快速，低安全性）"
+
+msgid "Simple"
+msgstr "简单"
+
+msgid "Simple (Weak)"
+msgstr "简单（弱）"
+
+msgid "Auto Add Iptables Rule"
+msgstr "自动添加防火墙规则"
+
+msgid "Automatically add iptables rules to block kernel TCP RST. Required for FakeTCP mode."
+msgstr "自动添加 iptables 规则以阻止内核 TCP RST。FakeTCP 模式必需。"
+
+msgid "Automatically add iptables rules. Required for FakeTCP mode."
+msgstr "自动添加 iptables 规则。FakeTCP 模式必需。"
+
+msgid "Auto Iptables Rule"
+msgstr "自动防火墙规则"
+
+msgid "Keep Iptables Rule"
+msgstr "保持防火墙规则"
+
+msgid "Monitor iptables and auto re-add rules if cleared. Recommended for OpenWrt."
+msgstr "监控 iptables 并在规则被清除时自动重新添加。推荐在 OpenWrt 上使用。"
+
+msgid "Monitor iptables and auto re-add rules if necessary."
+msgstr "监控 iptables 并在必要时自动重新添加规则。"
+
+msgid "Monitor iptables and auto re-add rules if cleared."
+msgstr "监控 iptables 并在规则被清除时自动重新添加。"
+
+msgid "Disable Anti-Replay"
+msgstr "禁用防重放"
+
+msgid "Disable replay attack protection. NOT recommended for security reasons."
+msgstr "禁用重放攻击保护。出于安全原因不推荐。"
+
+msgid "Disable replay attack protection. NOT recommended."
+msgstr "禁用重放攻击保护。不推荐。"
+
+msgid "Not recommended! Disables replay attack protection."
+msgstr "不推荐！禁用重放攻击保护。"
+
+msgid "Sequence Mode"
+msgstr "序列号模式"
+
+msgid "FakeTCP sequence number simulation mode. Mode 3 simulates real TCP behavior."
+msgstr "伪TCP 序列号模拟模式。模式 3 模拟真实 TCP 行为。"
+
+msgid "FakeTCP sequence number mode. Must match server configuration."
+msgstr "伪TCP 序列号模式。必须与服务端配置一致。"
+
+msgid "FakeTCP sequence number mode."
+msgstr "伪TCP序列号模式。"
+
+msgid "0 - Static"
+msgstr "0 - 静态"
+
+msgid "0 - Static (no increment)"
+msgstr "0 - 静态（不递增）"
+
+msgid "1 - Increment every packet"
+msgstr "1 - 每个包递增"
+
+msgid "2 - Random increment"
+msgstr "2 - 随机递增"
+
+msgid "2 - Random increment (~3 packets)"
+msgstr "2 - 随机递增（约3个包）"
+
+msgid "3 - Simulate real TCP"
+msgstr "3 - 模拟真实TCP"
+
+msgid "3 - Simulate real TCP (Recommended)"
+msgstr "3 - 模拟真实TCP（推荐）"
+
+msgid "4 - No Window Scale"
+msgstr "4 - 无窗口缩放"
+
+msgid "4 - Like 3, no Window Scale"
+msgstr "4 - 类似3，无窗口缩放"
+
+msgid "Lower Level"
+msgstr "链路层模式"
+
+msgid "Send packets at OSI layer 2 to bypass local iptables. Format: eth0#00:11:22:33:44:55 or auto."
+msgstr "在 OSI 第二层发送数据包以绕过本地 iptables。格式：eth0#00:11:22:33:44:55 或 auto。"
+
+msgid "Send packets at OSI layer 2. Format: eth0#00:11:22:33:44:55 or auto."
+msgstr "在 OSI 第二层发送数据包。格式：eth0#00:11:22:33:44:55 或 auto。"
+
+msgid "Send packets at OSI layer 2. Format: <code>eth0#00:11:22:33:44:55</code> or <code>auto</code>."
+msgstr "在OSI第二层发送数据包。格式：<code>eth0#00:11:22:33:44:55</code> 或 <code>auto</code>。"
+
+msgid "Source IP"
+msgstr "源IP"
+
+msgid "Force source IP for raw socket. Client only option."
+msgstr "强制原始套接字使用此源IP。仅客户端选项。"
+
+msgid "Force Source IP"
+msgstr "强制源IP"
+
+msgid "Force source IP for raw socket."
+msgstr "强制原始套接字使用此源IP。"
+
+msgid "Source Port"
+msgstr "源端口"
+
+msgid "Force source port for raw socket. Disables port changing during reconnection. Client only option."
+msgstr "强制原始套接字使用此源端口。禁用重连时的端口更换。仅客户端选项。"
+
+msgid "Force Source Port"
+msgstr "强制源端口"
+
+msgid "Force source port. Disables port changing during reconnection."
+msgstr "强制源端口。禁用重连时的端口更换。"
+
+msgid "Fix GRO"
+msgstr "修复GRO"
+
+msgid "Try to fix huge packets caused by Generic Receive Offload."
+msgstr "尝试修复通用接收卸载导致的大包问题。"
+
+msgid "Try to fix huge packets caused by GRO."
+msgstr "尝试修复GRO导致的大包问题。"
+
+msgid "Fix GRO Issues"
+msgstr "修复GRO问题"
+
+msgid "Link-Level Mode"
+msgstr "链路层模式"
+
+msgid "Bind Device"
+msgstr "绑定设备"
+
+msgid "Bind raw socket to specific network interface for better performance."
+msgstr "将原始套接字绑定到特定网络接口以获得更好的性能。"
+
+msgid "Bind raw socket to specific network interface."
+msgstr "将原始套接字绑定到特定网络接口。"
+
+msgid "MTU Warning Threshold"
+msgstr "MTU警告阈值"
+
+msgid "Warn when packet size exceeds this value. Default: 1375."
+msgstr "当数据包大小超过此值时发出警告。默认：1375。"
+
+msgid "Warn when packet size exceeds this value."
+msgstr "当数据包大小超过此值时发出警告。"
+
+msgid "Socket Buffer Size"
+msgstr "套接字缓冲区大小"
+
+msgid "Socket Buffer Size (KB)"
+msgstr "套接字缓冲区大小（KB）"
+
+msgid "Socket buffer size in KB. Range: 10-10240, Default: 1024."
+msgstr "套接字缓冲区大小（KB）。范围：10-10240，默认：1024。"
+
+msgid "Socket buffer size in KB. Range: 10-10240."
+msgstr "套接字缓冲区大小（KB）。范围：10-10240。"
+
+msgid "Force Socket Buffer"
+msgstr "强制套接字缓冲区"
+
+msgid "Bypass system limitation when setting socket buffer size."
+msgstr "设置套接字缓冲区大小时绕过系统限制。"
+
+msgid "Bypass system limitation for socket buffer."
+msgstr "绕过套接字缓冲区的系统限制。"
+
+msgid "Disable BPF"
+msgstr "禁用BPF"
+
+msgid "Disable kernel space BPF filter. Only use if you suspect a bug."
+msgstr "禁用内核空间 BPF 过滤器。仅在怀疑存在错误时使用。"
+
+msgid "Disable kernel space BPF filter."
+msgstr "禁用内核空间 BPF 过滤器。"
+
+msgid "Disable kernel space filter."
+msgstr "禁用内核空间过滤器。"
+
+msgid "Heartbeat Length"
+msgstr "心跳包长度"
+
+msgid "Length of heartbeat packets (0-1500 bytes)."
+msgstr "心跳包长度（0-1500 字节）。"
+
+msgid "Length of heartbeat packet (0-1500)."
+msgstr "心跳包长度（0-1500）。"
+
+msgid "Extra Arguments"
+msgstr "额外参数"
+
+msgid "Additional command line arguments not covered by the GUI."
+msgstr "GUI 未涵盖的其他命令行参数。"
+
+msgid "Additional command line arguments."
+msgstr "其他命令行参数。"
+
+msgid "Additional command line arguments, one per line."
+msgstr "额外的命令行参数，每行一个。"
+
+msgid "Service Status:"
+msgstr "服务状态："
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Service Disabled"
+msgstr "服务已禁用"
+
+msgid "Disabled"
+msgstr "已禁用"
+
+msgid "Binary Not Found"
+msgstr "未找到程序"
+
+msgid "tunnels"
+msgstr "个隧道"
+
+msgid "Tunnel Status"
+msgstr "隧道状态"
+
+msgid "System Diagnostics"
+msgstr "系统诊断"
+
+msgid "Binary Status:"
+msgstr "程序状态："
+
+msgid "Installed"
+msgstr "已安装"
+
+msgid "Not found at /usr/bin/udp2raw"
+msgstr "在 /usr/bin/udp2raw 未找到"
+
+msgid "Iptables Rules:"
+msgstr "防火墙规则："
+
+msgid "Rules detected (RST blocking active)"
+msgstr "已检测到规则（RST阻断已激活）"
+
+msgid "No rules detected - will be added when tunnel starts"
+msgstr "未检测到规则 - 隧道启动时将自动添加"
+
+msgid "Safety Tips:"
+msgstr "安全提示："
+
+msgid "FakeTCP mode requires iptables rules to block kernel TCP RST"
+msgstr "FakeTCP 模式需要 iptables 规则来阻止内核 TCP RST"
+
+msgid "Use \"Keep Iptables Rules\" option for OpenWrt stability"
+msgstr "使用"保持防火墙规则"选项以确保 OpenWrt 稳定性"
+
+msgid "Ensure password and modes match on both client and server"
+msgstr "确保密码和模式在客户端和服务端保持一致"
+
+msgid "For WireGuard: add route exception to prevent traffic loop"
+msgstr "对于 WireGuard：添加路由例外以防止流量循环"
+
+msgid "Recent Logs"
+msgstr "最近日志"
+
+msgid "Scroll to Bottom"
+msgstr "滚动到底部"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "WireGuard Integration Guide"
+msgstr "WireGuard 集成指南"
+
+msgid "Critical Safety Information"
+msgstr "重要安全信息"
+
+msgid "No tunnels configured. Go to Configuration tab to add one."
+msgstr "未配置隧道。请转到配置页面添加。"
+
+msgid "Port is required"
+msgstr "端口为必填项"
+
+msgid "Port must be between 1 and 65535"
+msgstr "端口必须在 1 到 65535 之间"
+
+msgid "Password must be at least 8 characters"
+msgstr "密码至少需要8个字符"
+
+msgid "This is a weak password! Please use a strong random password."
+msgstr "这是一个弱密码！请使用强随机密码。"
+
+msgid "Invalid IP address or hostname format"
+msgstr "无效的IP地址或主机名格式"
+
+msgid "Invalid IPv4 address"
+msgstr "无效的IPv4地址"
+
+msgid "Udp2raw Not Installed"
+msgstr "udp2raw 程序未安装"
+
+msgid "The udp2raw binary was not found. Please install it first:"
+msgstr "未找到 udp2raw 程序。请先安装："
+
+msgid "Or download from: "
+msgstr "或从此处下载："
+
+msgid "0 - Never"
+msgstr "0 - 从不"
+
+msgid "1 - Fatal"
+msgstr "1 - 致命"
+
+msgid "2 - Error"
+msgstr "2 - 错误"
+
+msgid "3 - Warning"
+msgstr "3 - 警告"
+
+msgid "4 - Info (Recommended)"
+msgstr "4 - 信息（推荐）"
+
+msgid "5 - Debug"
+msgstr "5 - 调试"
+
+msgid "6 - Trace"
+msgstr "6 - 追踪"
+
+msgid "FakeTCP mode REQUIRES iptables rules to block kernel TCP RST packets"
+msgstr "伪TCP模式必须使用iptables规则阻止内核发送TCP RST包"
+
+msgid "On OpenWrt, iptables rules may be cleared when network settings change"
+msgstr "在OpenWrt上，网络设置变更时iptables规则可能被清除"
+
+msgid "The \"Keep Iptables Rules\" option is STRONGLY recommended for OpenWrt"
+msgstr "在OpenWrt上强烈建议启用"保持防火墙规则"选项"
+
+msgid "Password/Key, Raw Mode, Cipher Mode, and Auth Mode MUST match on both sides"
+msgstr "密码、传输模式、加密模式和认证模式必须在两端保持一致"
+
+msgid "Scenario: Bypass UDP blocking for WireGuard"
+msgstr "场景：绕过UDP封锁使用WireGuard"
+
+msgid "This setup wraps WireGuard's UDP traffic in encrypted FakeTCP to bypass firewalls."
+msgstr "此设置将WireGuard的UDP流量封装在加密的伪TCP中以绕过防火墙。"
+
+msgid "On VPS Server (runs udp2raw in server mode):"
+msgstr "在VPS服务器上（以服务端模式运行udp2raw）："
+
+msgid "On OpenWrt Router (runs udp2raw in client mode):"
+msgstr "在OpenWrt路由器上（以客户端模式运行udp2raw）："
+
+msgid "IMPORTANT: "
+msgstr "重要："
+
+msgid "Add route exception so VPS IP bypasses VPN tunnel!"
+msgstr "添加路由例外，使VPS IP绕过VPN隧道！"
+
+msgid "Route Exception Example:"
+msgstr "路由例外示例："
+
+msgid "More information: "
+msgstr "更多信息："
+
+msgid "Official WireGuard Configuration Guide"
+msgstr "官方WireGuard配置指南"
+
+msgid "Protocol"
+msgstr "协议"
+
+msgid "PID"
+msgstr "进程ID"
+
+msgid "Local"
+msgstr "本地"
+
+msgid "Remote"
+msgstr "远程"
+
+msgid "No udp2raw logs found in system log."
+msgstr "系统日志中未找到 udp2raw 日志。"
+
+msgid "Last 100 log entries from system log (logread -e udp2raw)"
+msgstr "系统日志中最后100条条目 (logread -e udp2raw)"
+
+msgid "UDP Tunnel Manager converts UDP traffic into encrypted FakeTCP/UDP/ICMP traffic using raw sockets. This helps bypass UDP firewalls and provides stable tunneling for VPN protocols like WireGuard."
+msgstr "UDP 隧道管理器使用原始套接字将 UDP 流量转换为加密的 FakeTCP/UDP/ICMP 流量。这有助于绕过 UDP 防火墙，并为 WireGuard 等 VPN 协议提供稳定的隧道。"
+
+msgid "UDP Tunnel"
+msgstr "UDP 隧道"

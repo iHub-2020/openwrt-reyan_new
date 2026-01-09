@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Copyright (C) 2024 iHub-2020
+#
+# UCI defaults script for luci-app-udp-tunnel
+#
+# Version: 1.1.0
+# Last Updated: 2026-01-10
+#
+# 注意：配置文件的初始化已移交由 udp2raw 后端包处理。
+# 此脚本仅负责 LuCI 相关的环境刷新。
+
+# 重启 rpcd 使 ACL 生效
+if [ -x /etc/init.d/rpcd ]; then
+    /etc/init.d/rpcd reload 2>/dev/null
+fi
+
+# 清除 LuCI 缓存，确保菜单更新
+rm -rf /tmp/luci-* 2>/dev/null
+
+exit 0

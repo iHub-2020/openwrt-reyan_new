@@ -1,0 +1,15 @@
+{
+	"luci-app-udp-tunnel": {
+		"description": "Grant access to udp2raw configuration and system status",
+		"read": {
+			"uci": [ "udp2raw" ],
+			"ubus": {
+				"service": [ "list" ],
+				"file": [ "exec", "stat", "read" ]
+			}
+		},
+		"write": {
+			"uci": [ "udp2raw" ]
+		}
+	}
+}
