@@ -68,8 +68,9 @@ make package/luci-app-udp2raw/compile V=s
 
 # 6. Find IPK
 ls bin/packages/*/luci/luci-app-udp2raw_*.ipk
+```
 
-Dependencies
+## Dependencies
 udp2raw - The binary package (must be installed separately or included in build)
 Usage
 Access LuCI web interface
@@ -81,7 +82,7 @@ Save & Apply
 Migration from Old Version
 If you're upgrading from the old CBI/Lua version:
 
-bash
+```bash
 # Backup your old configuration
 cp /etc/config/udp2raw /etc/config/udp2raw.backup
 
@@ -92,14 +93,15 @@ opkg remove luci-app-udp2raw
 opkg install luci-app-udp2raw_*.ipk
 
 # Restore configuration (should be compatible)
+```
 
-License
+## License
 GPL-3.0-only
 
-Author
+## Author
 Based on original work by sensec
-Upgraded by: Your Name your.email@example.com
+Upgraded by: Reyanmatic <yanmaticyan@gmail.com>
 
-Links
+## Links
 Original project: https://github.com/sensec/luci-app-udp2raw
 udp2raw: https://github.com/wangyu-/udp2raw
