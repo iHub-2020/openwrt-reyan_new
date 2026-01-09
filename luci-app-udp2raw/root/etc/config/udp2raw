@@ -8,37 +8,48 @@
 # Last Updated: 2026-01-09
 # Depends: udp2raw (>= 20230206.0)
 
-config global 'global'
-    option enable '0'
+config udp2raw 'general'
+	option enable '0'
+	option daemon_user 'root'
+	option log_level '3'
 
-# 客户端模式：OpenWrt 作为客户端，连接远程 VPS
+# ============================================================
+# Client Instance (OpenWrt connects to Remote Server)
+# ============================================================
 config client
-    option enable '0'
-    option server_addr '44.55.66.77'
-    option server_port '4096'
-    option local_addr '127.0.0.1'
-    option local_port '3333'
-    option password 'password'
-    option raw_mode 'faketcp'
-    option cipher_mode 'aes128cbc'
-    option auth_mode 'hmac_sha1'
-    option fix_gro '1'
-    option keep_rule '1'
-    option auto_rule '0'
-    option seq_mode '3'
+	option enable '0'
+	option server_addr '10.10.10.10'
+	option server_port '4096'
+	option local_addr '127.0.0.1'
+	option local_port '4096'
+	option password 'password'
+	# Options: faketcp (default), udp, icmp
+	option raw_mode 'faketcp'
+	# Options: aes128cbc (default), xor, none
+	option cipher_mode 'aes128cbc'
+	# Options: hmac_sha1, md5 (default), crc32, simple, none
+	option auth_mode 'hmac_sha1'
+	# Fix GRO issue on OpenWrt (Important for stability)
+	option fix_gro '1'
+	# Auto re-add iptables rules if cleared by firewall restart
+	option keep_rule '1'
+	option seq_mode '3'
+	option extra_options ''
 
-# 服务端模式：OpenWrt 作为服务端，等待外部连接
+# ============================================================
+# Server Instance (OpenWrt waits for connections)
+# ============================================================
 config server
-    option enable '0'
-    option local_addr '0.0.0.0'
-    option local_port '4096'
-    option remote_addr '0.0.0.0'
-    option remote_port '7777'
-    option password 'password'
-    option raw_mode 'faketcp'
-    option cipher_mode 'aes128cbc'
-    option auth_mode 'hmac_sha1'
-    option fix_gro '1'
-    option keep_rule '1'
-    option auto_rule '0'
-    option seq_mode '3'
+	option enable '0'
+	option local_addr '0.0.0.0'
+	option local_port '4096'
+	option remote_addr '127.0.0.1'
+	option remote_port '7777'
+	option password 'password'
+	option raw_mode 'faketcp'
+	option cipher_mode 'aes128cbc'
+	option auth_mode 'hmac_sha1'
+	option fix_gro '1'
+	option keep_rule '1'
+	option seq_mode '3'
+	option extra_options ''
