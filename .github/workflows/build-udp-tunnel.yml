@@ -5,7 +5,7 @@
 #
 # Author: Reyanmatic
 # Date: 2026-01-10
-# Version: 1.6.0 (Fixed SDK URLs, improved feed reliability)
+# Version: 1.7.0 (Fixed error handling, added Release publishing, artifact cleanup)
 # License: MIT
 # ==============================================================================
 
@@ -19,6 +19,10 @@ on:
         required: false
         default: 'true'
         type: boolean
+
+# 需要写入权限以创建 Release
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -88,21 +92,173 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          make package/udp2raw/compile V=s IGNORE_ERRORS=1
+          # 移除 IGNORE_ERRORS，编译失败立即中断
+          make package/udp2raw/compile V=s
+          
+          # 验证 ipk 是否生成
+          if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
+            echo "ERROR: udp2raw ipk not found!"
+            exit 1
+          fi
 
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
         run: |
-          make package/luci-app-udp-tunnel/compile V=s IGNORE_ERRORS=1
+          make package/luci-app-udp-tunnel/compile V=s
+          
+          # 验证 ipk 是否生成
+          if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
+            echo "ERROR: luci-app-udp-tunnel ipk not found!"
+            exit 1
+          fi
 
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          find sdk/bin -name "*.ipk" -exec cp {} artifacts/ \;
+          
+          # 只收集目标包，不包含 feeds 依赖
+          find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
+          find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
+          find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
+          
+          echo "=== Collected artifacts ==="
           ls -la artifacts/
+          
+          # 确保有文件
+          if [ -z "$(ls -A artifacts/)" ]; then
+            echo "ERROR: No artifacts collected!"
+            exit 1
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: udp-tunnel-${{ matrix.arch }}
           path: artifacts/*.ipk
+          retention-days: 7
+
+  # 发布 Release
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      - name: Prepare Release Files
+        run: |
+          mkdir -p final-release
+          find release-files -name "*.ipk" -exec cp {} final-release/ \;
+          
+          echo "=== Release files ==="
+          ls -la final-release/
+
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          TAG="v$(date +'%Y%m%d-%H%M%S')"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Generated tag: $TAG"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: UDP-Tunnel ${{ steps.tag.outputs.tag }}
+          body: |
+            ## UDP-Tunnel 自动构建
+            
+            构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            提交: ${{ github.sha }}
+            
+            ### 包含文件
+            - udp2raw (x86_64, aarch64)
+            - luci-app-udp-tunnel (x86_64, aarch64)
+            - luci-i18n-udp-tunnel-zh-cn
+            
+            ### 安装方法
+            ```bash
+            opkg install udp2raw*.ipk luci-app-udp-tunnel*.ipk luci-i18n-udp-tunnel*.ipk
+            ```
+          files: final-release/*.ipk
+          draft: false
+          prerelease: false
+
+  # 清理旧的 Artifacts 和 Releases
+  cleanup:
+    name: Cleanup Old Artifacts and Releases
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: artifacts } = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            // 按名称分组，每组只保留最新 3 个
+            const groups = {};
+            for (const artifact of artifacts.artifacts) {
+              const name = artifact.name.replace(/-x86_64|-aarch64/g, '');
+              if (!groups[name]) groups[name] = [];
+              groups[name].push(artifact);
+            }
+            
+            for (const [name, items] of Object.entries(groups)) {
+              // 按创建时间排序，保留最新 3 个
+              items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const toDelete = items.slice(3);
+              
+              for (const artifact of toDelete) {
+                console.log(`Deleting artifact: ${artifact.name} (${artifact.id})`);
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
+                });
+              }
+            }
+
+      - name: Delete Old Releases
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            // 按创建时间排序，保留最新 3 个
+            releases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const toDelete = releases.slice(3);
+            
+            for (const release of toDelete) {
+              console.log(`Deleting release: ${release.tag_name} (${release.id})`);
+              
+              // 删除关联的 tag
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${release.tag_name}`
+                });
+              } catch (e) {
+                console.log(`Tag ${release.tag_name} already deleted or not found`);
+              }
+              
+              // 删除 release
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              });
+            }
