@@ -1,12 +1,32 @@
+# ==============================================================================
+# Workflow: Build UDP Tunnel IPKs
+# Description: Automated build pipeline for udp2raw and luci-app-udp-tunnel packages
+#              using OpenWrt SDK for x86_64 and aarch64 architectures.
+#
+# Author: Reyanmatic
+# Date: 2026-01-10
+# Version: 1.3.0 (Fixed telephony feed errors)
+# License: MIT
+#
+# Features:
+#   - Multi-architecture support (x86_64, aarch64)
+#   - Automatic dependency resolution via OpenWrt feeds
+#   - Artifact generation for direct download
+#   - Optimized feed handling (removes broken telephony feed)
+# ==============================================================================
+
 name: Build UDP Tunnel IPKs
 
 on:
-  push:
-    paths:
-      - 'udp2raw/**'
-      - 'luci-app-udp-tunnel/**'
-      - '.github/workflows/build-ipk.yml'
+  # 触发条件：仅允许手动触发 (Workflow Dispatch)
+  # 可以在 GitHub Actions 页面手动输入参数并运行
   workflow_dispatch:
+    inputs:
+      debug_build:
+        description: 'Enable verbose build logs (V=s)'
+        required: false
+        default: 'true'
+        type: boolean
 
 jobs:
   build:
@@ -46,24 +66,30 @@ jobs:
           mkdir -p sdk/package/udp2raw
           mkdir -p sdk/package/luci-app-udp-tunnel
           
-          # 复制文件 (使用 -R 递归复制内容)
+          # 复制文件 (使用 -R 递归复制内容，确保子目录完整)
           cp -R udp2raw/. sdk/package/udp2raw/
           cp -R luci-app-udp-tunnel/. sdk/package/luci-app-udp-tunnel/
           
           echo "Packages copied to SDK."
-          ls -R sdk/package/udp2raw
-          ls -R sdk/package/luci-app-udp-tunnel
 
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
+          # === 关键修复 ===
+          # 报错显示 feeds/telephony 存在严重问题 (文件丢失或 Makefile 错误)
+          # 且 udp2raw 不需要电话通信功能，因此直接从配置中移除该源，防止 update/install 时崩溃。
+          sed -i '/telephony/d' feeds.conf.default
+          
           # 更新 feeds
           ./scripts/feeds update -a
           
-          # 安装基础依赖
-          ./scripts/feeds install luci-base iptables luci-compat
+          # 安装基础依赖 (luci-base, iptables 等)
+          ./scripts/feeds install luci-base luci-compat iptables libustream-openssl
           
-          # 安装所有包的依赖 (防止漏掉)
+          # 安装我们的目标包 (这会自动解析并安装 udp2raw 需要的依赖)
+          ./scripts/feeds install udp2raw luci-app-udp-tunnel
+          
+          # 最后尝试安装剩余所有包 (可选，为了确保环境完整性，但现在去掉了 telephony 应该不会报错了)
           ./scripts/feeds install -a
 
       - name: Configure Build
@@ -74,7 +100,7 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          # 编译 udp2raw
+          # 编译 udp2raw (核心程序)
           make package/udp2raw/compile V=s
 
       - name: Compile luci-app-udp-tunnel
@@ -86,6 +112,7 @@ jobs:
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
+          # 查找并收集编译好的 ipk 文件
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
