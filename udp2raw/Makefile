@@ -6,10 +6,13 @@
 # Project: udp2raw OpenWrt Package
 # Maintainer: iHub-2020
 # Upstream: https://github.com/wangyu-/udp2raw
-# Version: 20230206.0 (Latest Stable Release)
+# Version: 0.0.0 (Rolling Release - Always Latest)
 # Last Updated: 2026-01-10
 #
 # Changelog:
+#   2026-01-10 - Fixed version mismatch: now uses rolling release v0.0.0
+#              - This version always points to the latest build
+#              - No need to update PKG_VERSION when upstream rebuilds
 #   2026-01-10 - Switched to Binary Release mode (downloads pre-compiled binaries)
 #              - Source repo switched to iHub-2020/udp2raw
 #              - Simplified build process, removed local compilation
@@ -24,11 +27,12 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
 # ----------------------------------------------------------------------------
-# 【重要】版本号设置
-# 1. 去 GitHub Actions 查看最新生成的 Release Tag (例如 v0.0.45)
-# 2. 将 PKG_VERSION 设置为不带 v 的数字部分 (例如 0.0.45)
+# 【重要】滚动版本号设置
+# 使用固定版本号 0.0.0，对应 GitHub Release Tag: v0.0.0
+# 上游 build-udp2raw-release.yml 每次构建都会覆盖 v0.0.0 的二进制文件
+# 因此这里永远不需要修改版本号
 # ----------------------------------------------------------------------------
-PKG_VERSION:=0.0.45
+PKG_VERSION:=0.0.0
 PKG_RELEASE:=1
 
 # ============================================================
@@ -38,6 +42,7 @@ REPO_USER:=iHub-2020
 REPO_NAME:=udp2raw
 
 # 手动定义下载地址，不让 package.mk 自动处理
+# 下载 URL: https://github.com/iHub-2020/udp2raw/releases/download/v0.0.0/udp2raw_x86_64
 MANUAL_DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
 
 # 移除 PKG_SOURCE 定义，避免 OpenWrt 自动检查 hash
@@ -77,8 +82,9 @@ define Package/udp2raw/description
   - iptables lock conflict prevention (--wait-lock)
   - Network initialization retry (--retry-on-error)
   
-  WARNING: This package downloads pre-compiled STATIC binaries from GitHub.
-  Ensure your architecture is supported (x86_64 or aarch64).
+  NOTE: This package downloads pre-compiled STATIC binaries from GitHub.
+  Using rolling release v0.0.0 which always contains the latest build.
+  Supported architectures: x86_64, aarch64
 endef
 
 # ------------------------------------------------------------------
@@ -97,16 +103,19 @@ endef
 # ------------------------------------------------------------------
 define Build/Compile
 	@echo "======================================================="
-	@echo "Downloading udp2raw binary version: v$(PKG_VERSION)"
+	@echo "Downloading udp2raw binary (Rolling Release)"
+	@echo "Version Tag: v$(PKG_VERSION)"
 	@echo "Target Architecture: $(ARCH)"
 	@echo "Download URL Base: $(MANUAL_DOWNLOAD_URL)"
 	@echo "======================================================="
 
 	# 根据架构下载对应的文件
 	@if [ "$(ARCH)" = "x86_64" ]; then \
+		echo "Downloading: $(MANUAL_DOWNLOAD_URL)/udp2raw_x86_64"; \
 		curl -L -k --fail --connect-timeout 30 --retry 3 \
 			-o $(PKG_BUILD_DIR)/udp2raw "$(MANUAL_DOWNLOAD_URL)/udp2raw_x86_64"; \
 	elif [ "$(ARCH)" = "aarch64" ]; then \
+		echo "Downloading: $(MANUAL_DOWNLOAD_URL)/udp2raw_aarch64"; \
 		curl -L -k --fail --connect-timeout 30 --retry 3 \
 			-o $(PKG_BUILD_DIR)/udp2raw "$(MANUAL_DOWNLOAD_URL)/udp2raw_aarch64"; \
 	else \
@@ -117,17 +126,22 @@ define Build/Compile
 	# 校验文件：确保文件存在且大小大于 100KB (避免下载到 404 页面或空文件)
 	@if [ ! -s "$(PKG_BUILD_DIR)/udp2raw" ]; then \
 		echo "Error: Download failed, file is empty."; \
+		echo "Please ensure Release v$(PKG_VERSION) exists at:"; \
+		echo "  https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/tag/v$(PKG_VERSION)"; \
 		exit 1; \
 	fi
 	@FILE_SIZE=$$(stat -c%s "$(PKG_BUILD_DIR)/udp2raw"); \
 	if [ $$FILE_SIZE -lt 100000 ]; then \
 		echo "Error: File too small ($$FILE_SIZE bytes). Likely a 404 error page or broken download."; \
-		echo "Check if Release v$(PKG_VERSION) exists on GitHub."; \
+		echo "Please verify the Release exists at:"; \
+		echo "  https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/tag/v$(PKG_VERSION)"; \
 		exit 1; \
 	fi
 	
 	chmod +x $(PKG_BUILD_DIR)/udp2raw
-	@echo "Download and setup complete."
+	@echo "======================================================="
+	@echo "Download complete. File size: $$FILE_SIZE bytes"
+	@echo "======================================================="
 endef
 
 define Package/udp2raw/install
