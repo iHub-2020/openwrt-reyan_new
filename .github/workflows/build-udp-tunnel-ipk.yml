@@ -1,15 +1,15 @@
 # ==============================================================================
-# Workflow: Build UDP Tunnel IPKs
+# Workflow: Build_UDP-Tunnel_IPKs
 # Description: Automated build pipeline for udp2raw and luci-app-udp-tunnel packages
 #              using OpenWrt SDK for x86_64 and aarch64 architectures.
 #
 # Author: Reyanmatic
 # Date: 2026-01-10
-# Version: 1.4.0 (Fixed feeds directory missing error & Git permissions)
+# Version: 1.5.0 (Fixed feeds directory missing error & Git permissions)
 # License: MIT
 # ==============================================================================
 
-name: Build UDP Tunnel IPKs
+name: Build_UDP-Tunnel_IPKs
 
 on:
   workflow_dispatch:
@@ -29,12 +29,12 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-            sdk_name: openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
+            sdk_url: https://mirror-03.infra.openwrt.org/releases/24.10.5/targets/x86/64/openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_name: openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
           
           - arch: aarch64
-            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/armsr/armv8/openwrt-sdk-23.05.5-armsr-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-            sdk_name: openwrt-sdk-23.05.5-armsr-armv8_gcc-12.3.0_musl.Linux-x86_64
+            sdk_url: https://mirror-03.infra.openwrt.org/releases/24.10.5/targets/x86/64/openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_name: openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
 
     steps:
       - name: Checkout Code
