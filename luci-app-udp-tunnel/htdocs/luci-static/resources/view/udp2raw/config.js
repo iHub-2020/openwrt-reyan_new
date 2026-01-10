@@ -12,10 +12,14 @@
  * - WireGuard integration support
  * 
  * @module luci-app-udp-tunnel/config
- * @version 1.4.1
+ * @version 1.4.2
  * @date 2026-01-10
  * 
  * Changelog:
+ *   v1.4.2 - Fixed TypeError when serviceStatus.udp2raw is undefined
+ *          - Fixed render() error when no tunnel sections exist
+ *          - Added defensive null checks throughout
+ *          - Fixed MultiValue option population with empty tunnel list
  *   v1.4.1 - Fixed TypeError when no tunnel sections exist
  *          - Fixed uci.sections() callback safety checks
  *          - Added null checks for all object iterations
@@ -49,7 +53,7 @@ return view.extend({
 		return Promise.all([
 			uci.load('udp2raw'),
 			L.resolveDefault(fs.stat('/usr/bin/udp2raw'), null),
-			L.resolveDefault(callServiceList('udp2raw'), {})
+			L.resolveDefault(callServiceList('udp2raw'), null)
 		]);
 	},
 	
@@ -83,6 +87,8 @@ return view.extend({
 		// ==================== 服务状态显示 ====================
 		var isRunning = false;
 		var runningCount = 0;
+		
+		// 安全检查 serviceStatus
 		try {
 			if (serviceStatus && 
 			    typeof serviceStatus === 'object' &&
@@ -92,16 +98,21 @@ return view.extend({
 			    typeof serviceStatus.udp2raw.instances === 'object') {
 				var instances = serviceStatus.udp2raw.instances;
 				var keys = Object.keys(instances);
-				for (var i = 0; i < keys.length; i++) {
-					var key = keys[i];
-					if (instances[key] && instances[key].running) {
-						isRunning = true;
-						runningCount++;
+				if (keys && keys.length > 0) {
+					for (var i = 0; i < keys.length; i++) {
+						var key = keys[i];
+						if (instances[key] && instances[key].running) {
+							isRunning = true;
+							runningCount++;
+						}
 					}
 				}
 			}
 		} catch (e) {
 			console.log('Error checking service status:', e);
+			// 出错时保持默认值
+			isRunning = false;
+			runningCount = 0;
 		}
 		
 		var statusColor = isRunning ? '#5cb85c' : '#d9534f';
@@ -160,15 +171,20 @@ return view.extend({
 			});
 		} catch (e) {
 			console.log('Error loading tunnel sections:', e);
+			tunnelSections = [];
 		}
 		
-		// 添加选项值
-		for (var i = 0; i < tunnelSections.length; i++) {
-			var section = tunnelSections[i];
-			var label = section.alias || section['.name'];
-			var mode = section.mode === 'server' ? _('Server') : _('Client');
-			var status = section.disabled === '1' ? ' [' + _('Disabled') + ']' : '';
-			o.value(section['.name'], label + ' (' + mode + ')' + status);
+		// 添加选项值（即使没有 tunnel 也不会报错）
+		if (tunnelSections && tunnelSections.length > 0) {
+			for (var i = 0; i < tunnelSections.length; i++) {
+				var section = tunnelSections[i];
+				if (section && section['.name']) {
+					var label = section.alias || section['.name'];
+					var mode = section.mode === 'server' ? _('Server') : _('Client');
+					var status = section.disabled === '1' ? ' [' + _('Disabled') + ']' : '';
+					o.value(section['.name'], label + ' (' + mode + ')' + status);
+				}
+			}
 		}
 		
 		// 保持 iptables 规则（全局）
@@ -210,17 +226,19 @@ return view.extend({
 		
 		// 只显示服务端实例
 		s.filter = function(section_id) {
+			if (!section_id) return false;
 			var mode = uci.get('udp2raw', section_id, 'mode');
 			return mode === 'server';
 		};
 		
 		s.sectiontitle = function(section_id) {
+			if (!section_id) return _('Unknown');
 			var alias = uci.get('udp2raw', section_id, 'alias');
 			return alias || section_id;
 		};
 		
 		s.modaltitle = function(section_id) {
-			var alias = uci.get('udp2raw', section_id, 'alias') || section_id;
+			var alias = section_id ? (uci.get('udp2raw', section_id, 'alias') || section_id) : _('New');
 			return _('UDP Tunnel - Edit Server Instance') + ': ' + alias;
 		};
 		
@@ -426,17 +444,19 @@ return view.extend({
 		
 		// 只显示客户端实例
 		s.filter = function(section_id) {
+			if (!section_id) return false;
 			var mode = uci.get('udp2raw', section_id, 'mode');
 			return mode !== 'server';
 		};
 		
 		s.sectiontitle = function(section_id) {
+			if (!section_id) return _('Unknown');
 			var alias = uci.get('udp2raw', section_id, 'alias');
 			return alias || section_id;
 		};
 		
 		s.modaltitle = function(section_id) {
-			var alias = uci.get('udp2raw', section_id, 'alias') || section_id;
+			var alias = section_id ? (uci.get('udp2raw', section_id, 'alias') || section_id) : _('New');
 			return _('UDP Tunnel - Edit Client Instance') + ': ' + alias;
 		};
 		
