@@ -10,9 +10,15 @@
 # Last Updated: 2026-01-10
 #
 # Changelog:
-#   2026-01-10 - Fixed "unknown PKG_BUILD_FLAGS" error by removing PKG_SOURCE
-#              - Switched to manual download in Build/Compile
+#   2026-01-10 - Switched to Binary Release mode (downloads pre-compiled binaries)
 #              - Source repo switched to iHub-2020/udp2raw
+#              - Simplified build process, removed local compilation
+#              - Updated init script to fix syntax error and support typed sections
+#   2026-01-09 - Fixed cross-compilation (bypass upstream hardcoded compiler)
+#              - Added init.d script with OpenWrt safety defaults
+#              - Added default config file with secure settings
+#              - Fixed dependencies (removed unnecessary iptables-mod-filter)
+#   2024-xx-xx - Initial release
 
 include $(TOPDIR)/rules.mk
 
@@ -25,6 +31,18 @@ PKG_NAME:=udp2raw
 PKG_VERSION:=0.0.45
 PKG_RELEASE:=1
 
+# ============================================================
+# Binary Release Mode Settings
+# ============================================================
+REPO_USER:=iHub-2020
+REPO_NAME:=udp2raw
+
+# 手动定义下载地址，不让 package.mk 自动处理
+MANUAL_DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
+
+# 移除 PKG_SOURCE 定义，避免 OpenWrt 自动检查 hash
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE.md
 PKG_MAINTAINER:=iHub-2020
@@ -33,11 +51,6 @@ PKG_MAINTAINER:=iHub-2020
 PKG_BUILD_PARALLEL:=0
 
 include $(INCLUDE_DIR)/package.mk
-
-# 手动定义下载地址，不让 package.mk 自动处理
-REPO_USER:=iHub-2020
-REPO_NAME:=udp2raw
-MANUAL_DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
 
 define Package/udp2raw
   SECTION:=net
