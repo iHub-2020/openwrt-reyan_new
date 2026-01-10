@@ -21,7 +21,7 @@ jobs:
             sdk_name: openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
           
           - arch: aarch64
-            # 使用 ARMv8 通用 SDK，适用于大多数现代 ARM 软路由 (R2S, R4S, N1等)
+            # 使用 ARMv8 通用 SDK
             sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/armsr/armv8/openwrt-sdk-23.05.5-armsr-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
             sdk_name: openwrt-sdk-23.05.5-armsr-armv8_gcc-12.3.0_musl.Linux-x86_64
 
@@ -32,7 +32,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file
+          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file curl
 
       - name: Download and Extract OpenWrt SDK
         run: |
@@ -42,51 +42,50 @@ jobs:
 
       - name: Prepare Package Sources
         run: |
-          # 将你的两个包复制到 SDK 的 package 目录下
+          # 创建目录
           mkdir -p sdk/package/udp2raw
           mkdir -p sdk/package/luci-app-udp-tunnel
           
-          # 复制文件 (假设你的仓库根目录就是包的文件夹)
-          cp -r udp2raw/* sdk/package/udp2raw/
-          cp -r luci-app-udp-tunnel/* sdk/package/luci-app-udp-tunnel/
+          # 复制文件 (使用 -R 递归复制内容)
+          cp -R udp2raw/. sdk/package/udp2raw/
+          cp -R luci-app-udp-tunnel/. sdk/package/luci-app-udp-tunnel/
           
           echo "Packages copied to SDK."
+          ls -R sdk/package/udp2raw
+          ls -R sdk/package/luci-app-udp-tunnel
 
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          # 更新 feeds 以获取依赖 (如 luci-base, iptables)
+          # 更新 feeds
           ./scripts/feeds update -a
           
-          # 安装 luci-base 和 iptables 依赖
-          ./scripts/feeds install luci-base iptables
+          # 安装基础依赖
+          ./scripts/feeds install luci-base iptables luci-compat
           
-          # 也可以尝试安装所有包的依赖定义，确保万无一失
+          # 安装所有包的依赖 (防止漏掉)
           ./scripts/feeds install -a
 
       - name: Configure Build
         working-directory: sdk
         run: |
-          # 生成默认配置
           make defconfig
 
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          # V=s 显示详细日志，方便排错
-          # 你的 Makefile 会根据 SDK 的 ARCH 自动下载对应的二进制文件
+          # 编译 udp2raw
           make package/udp2raw/compile V=s
 
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
         run: |
-          # 编译 LuCI 界面，它会调用 po2lmo 处理语言文件
+          # 编译 LuCI 界面
           make package/luci-app-udp-tunnel/compile V=s
 
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          # 查找生成的 ipk 文件并复制出来
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
