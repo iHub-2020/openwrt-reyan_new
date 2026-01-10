@@ -5,7 +5,7 @@
 #
 # Author: Reyanmatic
 # Date: 2026-01-10
-# Version: 1.5.0 (Fixed feeds directory missing error & Git permissions)
+# Version: 1.6.0 (Fixed SDK URLs, improved feed reliability)
 # License: MIT
 # ==============================================================================
 
@@ -29,12 +29,12 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            sdk_url: https://mirror-03.infra.openwrt.org/releases/24.10.5/targets/x86/64/openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_name: openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
+            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
+            sdk_name: openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
           
           - arch: aarch64
-            sdk_url: https://mirror-03.infra.openwrt.org/releases/24.10.5/targets/x86/64/openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_name: openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
+            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8/openwrt-sdk-23.05.5-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
+            sdk_name: openwrt-sdk-23.05.5-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64
 
     steps:
       - name: Checkout Code
@@ -43,68 +43,51 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          # 新增 rsync (SDK 脚本经常需要) 和 time
-          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file curl rsync time
-          
-          # === 关键修复 1: Git 安全配置 ===
-          # 防止 SDK 内部脚本在 clone 或操作 git 时因目录权限问题被拦截
+          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
           git config --global --add safe.directory '*'
 
       - name: Download and Extract OpenWrt SDK
         run: |
-          wget -O sdk.tar.xz ${{ matrix.sdk_url }}
+          wget -q -O sdk.tar.xz ${{ matrix.sdk_url }}
           tar -xf sdk.tar.xz
           mv ${{ matrix.sdk_name }} sdk
 
       - name: Prepare Package Sources
         run: |
-          mkdir -p sdk/package/udp2raw
-          mkdir -p sdk/package/luci-app-udp-tunnel
-          cp -R udp2raw/. sdk/package/udp2raw/
-          cp -R luci-app-udp-tunnel/. sdk/package/luci-app-udp-tunnel/
-          echo "Packages copied to SDK."
+          cp -R udp2raw sdk/package/
+          cp -R luci-app-udp-tunnel sdk/package/
 
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          # === 关键修复 2: 显式生成 feeds.conf 并清理 telephony ===
-          # 复制默认配置到 feeds.conf (SDK 优先读取此文件)
-          cp feeds.conf.default feeds.conf
+          # 使用 GitHub 镜像替代不稳定的 git.openwrt.org
+          cat > feeds.conf << 'EOF'
+          src-git-full base https://github.com/openwrt/openwrt.git;openwrt-23.05
+          src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
+          src-git luci https://github.com/openwrt/luci.git;openwrt-23.05
+          src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
+          EOF
           
-          # 删除 telephony 源 (避免之前的报错)
-          sed -i '/telephony/d' feeds.conf
+          # 更新 feeds，带重试
+          for i in 1 2 3; do
+            ./scripts/feeds update -a && break
+            echo "Retry $i..."
+            sleep 10
+          done
           
-          # 打印 feeds.conf 内容以便调试
-          echo "=== Content of feeds.conf ==="
-          cat feeds.conf
-          echo "============================="
+          [ -d "feeds/base" ] || { echo "feeds/base missing"; exit 1; }
           
-          # 更新 feeds (显示详细日志以便排错)
-          # 如果这一步失败，脚本会立即停止，不会继续执行导致后续的 "No such file" 错误
-          ./scripts/feeds update -a || { echo "Feeds update failed!"; exit 1; }
-          
-          # 检查目录是否真的生成了
-          if [ ! -d "feeds/base" ]; then
-            echo "Error: feeds/base directory missing after update!"
-            exit 1
-          fi
-
-          # 安装基础依赖
-          ./scripts/feeds install luci-base luci-compat iptables libustream-openssl
-          
-          # 安装目标包
-          ./scripts/feeds install udp2raw luci-app-udp-tunnel
+          # 安装依赖
+          ./scripts/feeds install luci-base luci-compat iptables
 
       - name: Configure Build
         working-directory: sdk
         run: |
-          # 生成默认配置
           make defconfig
 
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          # 忽略依赖检查失败 (IGNORE_ERRORS=1)，有时 SDK 对 host 工具版本过于敏感
           make package/udp2raw/compile V=s IGNORE_ERRORS=1
 
       - name: Compile luci-app-udp-tunnel
@@ -115,12 +98,11 @@ jobs:
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
-          find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
-          find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
+          find sdk/bin -name "*.ipk" -exec cp {} artifacts/ \;
+          ls -la artifacts/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: udp-tunnel-ipks-${{ matrix.arch }}
+          name: udp-tunnel-${{ matrix.arch }}
           path: artifacts/*.ipk
