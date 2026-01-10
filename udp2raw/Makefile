@@ -6,29 +6,23 @@
 # Project: udp2raw OpenWrt Package
 # Maintainer: iHub-2020
 # Upstream: https://github.com/wangyu-/udp2raw
-# Version: 20230206.0 (Latest Stable Release)
+# Version: 0.0.0 (Rolling Release)
 # Last Updated: 2026-01-10
 #
 # Changelog:
-#   2026-01-10 - Switched to Binary Release mode (downloads pre-compiled binaries)
-#              - Source repo switched to iHub-2020/udp2raw
-#              - Simplified build process, removed local compilation
-#              - Updated init script to fix syntax error and support typed sections
-#   2026-01-09 - Fixed cross-compilation (bypass upstream hardcoded compiler)
-#              - Added init.d script with OpenWrt safety defaults
-#              - Added default config file with secure settings
-#              - Fixed dependencies (removed unnecessary iptables-mod-filter)
-#   2024-xx-xx - Initial release
+#   2026-01-10 - Switched to Rolling Release mode (Fixed Version 0.0.0)
+#              - Makefile no longer needs manual updates.
+#              - Always downloads the latest binary from v0.0.0 tag.
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
 # ----------------------------------------------------------------------------
-# 【重要】版本号设置
-# 1. 去 GitHub Actions 查看最新生成的 Release Tag (例如 v0.0.45)
-# 2. 将 PKG_VERSION 设置为不带 v 的数字部分 (例如 0.0.45)
+# 【重要】滚动发布模式 (Rolling Release)
+# 版本号固定为 0.0.0，对应的 GitHub Release Tag 为 v0.0.0
+# GitHub Actions 会不断覆盖这个 Tag 下的文件，因此这里无需再修改。
 # ----------------------------------------------------------------------------
-PKG_VERSION:=0.0.45
+PKG_VERSION:=0.0.0
 PKG_RELEASE:=1
 
 # ============================================================
@@ -37,10 +31,10 @@ PKG_RELEASE:=1
 REPO_USER:=iHub-2020
 REPO_NAME:=udp2raw
 
-# 自动拼接 v 前缀，适配 GitHub Releases 的标准格式 vX.Y.Z
+# 固定指向 v0.0.0
 DOWNLOAD_BASE_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
 
-# 使用带版本号的 Source 名，避免 OpenWrt 缓存旧版本的同名文件
+# 使用带版本号的 Source 名
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-precompiled
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
@@ -51,12 +45,15 @@ PKG_MAINTAINER:=iHub-2020
 # 预编译包不需要并行编译
 PKG_BUILD_PARALLEL:=0
 
+# 跳过 Hash 校验，因为 v0.0.0 的文件内容会随时改变
+PKG_BUILD_FLAGS:=no-check-hash
+
 include $(INCLUDE_DIR)/package.mk
 
 define Package/udp2raw
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=UDP to FakeTCP/ICMP tunnel (Pre-compiled)
+  TITLE:=UDP to FakeTCP/ICMP tunnel (Pre-compiled / Rolling)
   URL:=https://github.com/iHub-2020/udp2raw
   DEPENDS:=+iptables
 endef
@@ -79,7 +76,7 @@ define Package/udp2raw/description
   - Network initialization retry (--retry-on-error)
   
   WARNING: This package downloads pre-compiled STATIC binaries from GitHub.
-  Ensure your architecture is supported (x86_64 or aarch64).
+  Version is fixed to 0.0.0 (Rolling Release).
 endef
 
 # ------------------------------------------------------------------
@@ -98,10 +95,13 @@ endef
 # ------------------------------------------------------------------
 define Build/Compile
 	@echo "======================================================="
-	@echo "Downloading udp2raw binary version: v$(PKG_VERSION)"
+	@echo "Downloading udp2raw binary (Rolling Release v$(PKG_VERSION))"
 	@echo "Target Architecture: $(ARCH)"
 	@echo "Download URL Base: $(DOWNLOAD_BASE_URL)"
 	@echo "======================================================="
+
+	# 强制移除旧文件，确保下载最新版
+	rm -f $(PKG_BUILD_DIR)/udp2raw
 
 	# 根据架构下载对应的文件
 	@if [ "$(ARCH)" = "x86_64" ]; then \
@@ -115,7 +115,7 @@ define Build/Compile
 		exit 1; \
 	fi
 	
-	# 校验文件：确保文件存在且大小大于 100KB (避免下载到 404 页面或空文件)
+	# 校验文件：确保文件存在且大小大于 100KB
 	@if [ ! -s "$(PKG_BUILD_DIR)/udp2raw" ]; then \
 		echo "Error: Download failed, file is empty."; \
 		exit 1; \
