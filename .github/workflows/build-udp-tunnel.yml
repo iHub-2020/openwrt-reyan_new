@@ -1,5 +1,5 @@
 # ==============================================================================
-# Workflow: Build_UDP-Tunnel_IPKs
+# Workflow: Build-UDP-Tunnel
 # Description: Automated build pipeline for udp2raw and luci-app-udp-tunnel packages
 #              using OpenWrt SDK for x86_64 and aarch64 architectures.
 #
@@ -9,7 +9,7 @@
 # License: MIT
 # ==============================================================================
 
-name: Build_UDP-Tunnel_IPKs
+name: Build-UDP-Tunnel
 
 on:
   workflow_dispatch:
