@@ -80,6 +80,14 @@ define Package/udp2raw/description
   Ensure your architecture is supported (x86_64 or aarch64).
 endef
 
+# ------------------------------------------------------------------
+# 关键修复: 重写 Build/Prepare
+# 必须显式定义此步骤，否则 OpenWrt 会尝试解压 PKG_SOURCE 导致报错
+# ------------------------------------------------------------------
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+endef
+
 # 不需要 Build/Configure，因为没有源码配置过程
 define Build/Configure
 endef
@@ -87,19 +95,17 @@ endef
 # 自定义编译步骤：下载并重命名
 # 注意：这里使用了 curl -L (跟随重定向) 和 -k (允许不安全的SSL，防止老旧系统证书问题)
 define Build/Compile
-	mkdir -p $(PKG_BUILD_DIR)
-	
 	# 根据 OpenWrt 架构选择对应的文件名
 	# 注意：这里必须与 build-release.yml 中的 output_name 对应
 	@echo "Detecting architecture for udp2raw..."
 	@if [ "$(ARCH)" = "x86_64" ]; then \
 		echo "Architecture: x86_64"; \
 		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_x86_64"; \
-		curl -L -k --fail -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_x86_64"; \
+		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_x86_64"; \
 	elif [ "$(ARCH)" = "aarch64" ]; then \
 		echo "Architecture: aarch64"; \
 		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_aarch64"; \
-		curl -L -k --fail -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_aarch64"; \
+		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_aarch64"; \
 	else \
 		echo "Error: Unsupported architecture $(ARCH). Only x86_64 and aarch64 are supported via Action."; \
 		exit 1; \
