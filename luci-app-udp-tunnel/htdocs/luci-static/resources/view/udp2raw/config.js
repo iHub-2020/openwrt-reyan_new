@@ -81,7 +81,8 @@ return view.extend({
 		var isRunning = false;
 		var runningCount = 0;
 		try {
-			if (serviceStatus.udp2raw && serviceStatus.udp2raw.instances) {
+            // 增加对 serviceStatus 本身的检查
+			if (serviceStatus && serviceStatus.udp2raw && serviceStatus.udp2raw.instances) {
 				for (var key in serviceStatus.udp2raw.instances) {
 					if (serviceStatus.udp2raw.instances[key].running) {
 						isRunning = true;
@@ -616,4 +617,5 @@ return view.extend({
 		
 		return m.render();
 	}
+
 });
