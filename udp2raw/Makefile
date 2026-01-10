@@ -23,6 +23,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
+# 这里填写不带 v 的版本号，例如 1.0 或 0.0.45
 PKG_VERSION:=20230206.0
 PKG_RELEASE:=6
 
@@ -33,7 +34,9 @@ PKG_RELEASE:=6
 # 确保你的 Release Tag 格式为 v20230206.0 (带 v 前缀)
 REPO_USER:=iHub-2020
 REPO_NAME:=udp2raw
-DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
+
+# 定义下载的基础 URL，注意这里拼接了 v 前缀
+DOWNLOAD_BASE_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
 
 # 这里的 PKG_SOURCE 仅作占位，防止 OpenWrt 构建系统报错
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-precompiled
@@ -100,12 +103,12 @@ define Build/Compile
 	@echo "Detecting architecture for udp2raw..."
 	@if [ "$(ARCH)" = "x86_64" ]; then \
 		echo "Architecture: x86_64"; \
-		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_x86_64"; \
-		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_x86_64"; \
+		echo "Downloading from: $(DOWNLOAD_BASE_URL)/udp2raw_x86_64"; \
+		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_BASE_URL)/udp2raw_x86_64"; \
 	elif [ "$(ARCH)" = "aarch64" ]; then \
 		echo "Architecture: aarch64"; \
-		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_aarch64"; \
-		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_aarch64"; \
+		echo "Downloading from: $(DOWNLOAD_BASE_URL)/udp2raw_aarch64"; \
+		curl -L -k --fail --connect-timeout 30 --retry 3 -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_BASE_URL)/udp2raw_aarch64"; \
 	else \
 		echo "Error: Unsupported architecture $(ARCH). Only x86_64 and aarch64 are supported via Action."; \
 		exit 1; \
