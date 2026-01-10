@@ -12,10 +12,13 @@
  * - WireGuard integration support
  * 
  * @module luci-app-udp-tunnel/config
- * @version 1.4.0
+ * @version 1.4.1
  * @date 2026-01-10
  * 
  * Changelog:
+ *   v1.4.1 - Fixed TypeError when no tunnel sections exist
+ *          - Fixed uci.sections() callback safety checks
+ *          - Added null checks for all object iterations
  *   v1.4.0 - Fixed UCI field names (remote_addr/remote_port instead of server_addr/server_port)
  *          - Fixed global section type ('general' instead of 'globals')
  *          - Removed "Run Daemon as User" option (udp2raw requires root)
@@ -81,16 +84,25 @@ return view.extend({
 		var isRunning = false;
 		var runningCount = 0;
 		try {
-            // 增加对 serviceStatus 本身的检查
-			if (serviceStatus && serviceStatus.udp2raw && serviceStatus.udp2raw.instances) {
-				for (var key in serviceStatus.udp2raw.instances) {
-					if (serviceStatus.udp2raw.instances[key].running) {
+			if (serviceStatus && 
+			    typeof serviceStatus === 'object' &&
+			    serviceStatus.udp2raw && 
+			    typeof serviceStatus.udp2raw === 'object' &&
+			    serviceStatus.udp2raw.instances &&
+			    typeof serviceStatus.udp2raw.instances === 'object') {
+				var instances = serviceStatus.udp2raw.instances;
+				var keys = Object.keys(instances);
+				for (var i = 0; i < keys.length; i++) {
+					var key = keys[i];
+					if (instances[key] && instances[key].running) {
 						isRunning = true;
 						runningCount++;
 					}
 				}
 			}
-		} catch (e) {}
+		} catch (e) {
+			console.log('Error checking service status:', e);
+		}
 		
 		var statusColor = isRunning ? '#5cb85c' : '#d9534f';
 		var statusText = isRunning 
@@ -137,14 +149,27 @@ return view.extend({
 		o = s.option(form.MultiValue, 'active_tunnels', _('Active Tunnels'),
 			_('Select which tunnel instances to run. If empty, all enabled tunnels will run.'));
 		o.optional = true;
-		uci.sections('udp2raw', 'tunnel', function(s) {
-			if (s['.name']) {
-				var label = s.alias || s['.name'];
-				var mode = s.mode === 'server' ? _('Server') : _('Client');
-				var status = s.disabled === '1' ? ' [' + _('Disabled') + ']' : '';
-				o.value(s['.name'], label + ' (' + mode + ')' + status);
-			}
-		});
+		
+		// 安全地获取 tunnel sections
+		var tunnelSections = [];
+		try {
+			uci.sections('udp2raw', 'tunnel', function(section) {
+				if (section && section['.name']) {
+					tunnelSections.push(section);
+				}
+			});
+		} catch (e) {
+			console.log('Error loading tunnel sections:', e);
+		}
+		
+		// 添加选项值
+		for (var i = 0; i < tunnelSections.length; i++) {
+			var section = tunnelSections[i];
+			var label = section.alias || section['.name'];
+			var mode = section.mode === 'server' ? _('Server') : _('Client');
+			var status = section.disabled === '1' ? ' [' + _('Disabled') + ']' : '';
+			o.value(section['.name'], label + ' (' + mode + ')' + status);
+		}
 		
 		// 保持 iptables 规则（全局）
 		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rules'),
@@ -185,7 +210,8 @@ return view.extend({
 		
 		// 只显示服务端实例
 		s.filter = function(section_id) {
-			return uci.get('udp2raw', section_id, 'mode') === 'server';
+			var mode = uci.get('udp2raw', section_id, 'mode');
+			return mode === 'server';
 		};
 		
 		s.sectiontitle = function(section_id) {
@@ -400,7 +426,8 @@ return view.extend({
 		
 		// 只显示客户端实例
 		s.filter = function(section_id) {
-			return uci.get('udp2raw', section_id, 'mode') !== 'server';
+			var mode = uci.get('udp2raw', section_id, 'mode');
+			return mode !== 'server';
 		};
 		
 		s.sectiontitle = function(section_id) {
