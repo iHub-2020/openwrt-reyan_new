@@ -10,7 +10,10 @@
 # Last Updated: 2026-01-10
 #
 # Changelog:
-#   2026-01-10 - Updated init script to fix syntax error and support typed sections
+#   2026-01-10 - Switched to Binary Release mode (downloads pre-compiled binaries)
+#              - Source repo switched to iHub-2020/udp2raw
+#              - Simplified build process, removed local compilation
+#              - Updated init script to fix syntax error and support typed sections
 #   2026-01-09 - Fixed cross-compilation (bypass upstream hardcoded compiler)
 #              - Added init.d script with OpenWrt safety defaults
 #              - Added default config file with secure settings
@@ -21,34 +24,39 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
 PKG_VERSION:=20230206.0
-PKG_RELEASE:=4
+PKG_RELEASE:=6
 
-# 使用官方 Release Tag
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/wangyu-/udp2raw.git
-PKG_SOURCE_VERSION:=20230206.0
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+# ============================================================
+# Binary Release Mode Settings
+# ============================================================
+# 我们不再下载源码编译，而是直接从 GitHub Releases 下载预编译好的二进制文件
+# 确保你的 Release Tag 格式为 v20230206.0 (带 v 前缀)
+REPO_USER:=iHub-2020
+REPO_NAME:=udp2raw
+DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
+
+# 这里的 PKG_SOURCE 仅作占位，防止 OpenWrt 构建系统报错
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-precompiled
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE.md
 PKG_MAINTAINER:=iHub-2020
 
-PKG_BUILD_PARALLEL:=1
-PKG_USE_MIPS16:=0
+# 由于是直接下载二进制，不需要并行编译
+PKG_BUILD_PARALLEL:=0
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/udp2raw
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=UDP to FakeTCP/ICMP tunnel
-  URL:=https://github.com/wangyu-/udp2raw
+  TITLE:=UDP to FakeTCP/ICMP tunnel (Pre-compiled)
+  URL:=https://github.com/iHub-2020/udp2raw
   # 依赖说明：
-  #   +libstdcpp +libpthread: C++ 运行时必需
   #   +iptables: udp2raw -a 选项需要 iptables 命令
-  DEPENDS:=+libstdcpp +libpthread +iptables
+  #   注意：由于我们在 Action 中使用了静态链接(-static)，这里不再需要 libstdcpp/libpthread
+  DEPENDS:=+iptables
 endef
 
 define Package/udp2raw/description
@@ -68,48 +76,44 @@ define Package/udp2raw/description
   - iptables lock conflict prevention (--wait-lock)
   - Network initialization retry (--retry-on-error)
   
-  WARNING: Requires proper iptables rules to function correctly!
+  WARNING: This package downloads pre-compiled STATIC binaries from GitHub.
+  Ensure your architecture is supported (x86_64 or aarch64).
 endef
 
-# 源文件列表（用于自定义编译）
-UDP2RAW_SOURCES:= \
-	main.cpp \
-	lib/md5.cpp \
-	lib/pbkdf2-sha1.cpp \
-	lib/pbkdf2-sha256.cpp \
-	encrypt.cpp \
-	log.cpp \
-	network.cpp \
-	common.cpp \
-	connection.cpp \
-	misc.cpp \
-	fd_manager.cpp \
-	client.cpp \
-	server.cpp \
-	lib/aes_faster_c/aes.cpp \
-	lib/aes_faster_c/wrapper.cpp \
-	my_ev.cpp
+# 不需要 Build/Configure，因为没有源码配置过程
+define Build/Configure
+endef
 
-# 自定义编译（绕过上游 makefile 的硬编码编译器路径）
+# 自定义编译步骤：下载并重命名
+# 注意：这里使用了 curl -L (跟随重定向) 和 -k (允许不安全的SSL，防止老旧系统证书问题)
 define Build/Compile
-	# 生成版本信息头文件
-	echo 'const char *gitversion = "$(PKG_VERSION)";' > $(PKG_BUILD_DIR)/git_version.h
+	mkdir -p $(PKG_BUILD_DIR)
 	
-	# 使用 OpenWrt 工具链编译
-	cd $(PKG_BUILD_DIR) && \
-	$(TARGET_CXX) \
-		$(TARGET_CXXFLAGS) \
-		-std=c++11 -DNDEBUG \
-		-Wall -Wextra \
-		-Wno-unused-variable \
-		-Wno-unused-parameter \
-		-Wno-missing-field-initializers \
-		-I$(PKG_BUILD_DIR) \
-		-isystem $(PKG_BUILD_DIR)/libev \
-		-o udp2raw \
-		$(addprefix $(PKG_BUILD_DIR)/,$(UDP2RAW_SOURCES)) \
-		$(TARGET_LDFLAGS) \
-		-lpthread -lrt
+	# 根据 OpenWrt 架构选择对应的文件名
+	# 注意：这里必须与 build-release.yml 中的 output_name 对应
+	@echo "Detecting architecture for udp2raw..."
+	@if [ "$(ARCH)" = "x86_64" ]; then \
+		echo "Architecture: x86_64"; \
+		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_x86_64"; \
+		curl -L -k --fail -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_x86_64"; \
+	elif [ "$(ARCH)" = "aarch64" ]; then \
+		echo "Architecture: aarch64"; \
+		echo "Downloading from: $(DOWNLOAD_URL)/udp2raw_aarch64"; \
+		curl -L -k --fail -o $(PKG_BUILD_DIR)/udp2raw "$(DOWNLOAD_URL)/udp2raw_aarch64"; \
+	else \
+		echo "Error: Unsupported architecture $(ARCH). Only x86_64 and aarch64 are supported via Action."; \
+		exit 1; \
+	fi
+	
+	# 检查下载是否成功 (文件是否存在且大小不为0)
+	@if [ ! -s "$(PKG_BUILD_DIR)/udp2raw" ]; then \
+		echo "Error: Download failed or file is empty."; \
+		exit 1; \
+	fi
+	
+	# 赋予执行权限
+	chmod +x $(PKG_BUILD_DIR)/udp2raw
+	@echo "Download and setup complete."
 endef
 
 define Package/udp2raw/install
