@@ -5,30 +5,20 @@
  * Complete configuration interface with validation and safety checks
  * 
  * Features:
- * - Multi-tunnel support (client and server modes)
+ * - Multi-tunnel support (Server & Client modes)
+ * - Tabbed interface (Basic/Advanced) for cleaner UI
  * - Input validation with security warnings
- * - Mode-specific options (source-ip/source-port for client only)
  * - Automatic iptables rule management for OpenWrt
- * - WireGuard integration support
  * 
  * @module luci-app-udp-tunnel/config
- * @version 1.4.2
- * @date 2026-01-10
+ * @version 1.9.1
+ * @date 2026-01-12
  * 
  * Changelog:
- *   v1.4.2 - Fixed TypeError when serviceStatus.udp2raw is undefined
- *          - Fixed render() error when no tunnel sections exist
- *          - Added defensive null checks throughout
- *          - Fixed MultiValue option population with empty tunnel list
- *   v1.4.1 - Fixed TypeError when no tunnel sections exist
- *          - Fixed uci.sections() callback safety checks
- *          - Added null checks for all object iterations
- *   v1.4.0 - Fixed UCI field names (remote_addr/remote_port instead of server_addr/server_port)
- *          - Fixed global section type ('general' instead of 'globals')
- *          - Removed "Run Daemon as User" option (udp2raw requires root)
- *          - Added help descriptions for all options
- *          - Fixed modal titles for server/client
- *          - Status display now uses table for alignment
+ *   v1.9.1 - CRITICAL FIX: Added 'rmempty = false' to instance enabled flags.
+ *            Prevents LuCI from removing the option when it matches default '1',
+ *            which caused the init script to fallback to '0' (disabled).
+ *   v1.9.0 - UI Restoration & Optimization.
  */
 
 'use strict';
@@ -59,9 +49,9 @@ return view.extend({
 	
 	render: function(data) {
 		var udp2rawInstalled = data[1] !== null;
-		var serviceStatus = data[2];
+		var serviceStatus = data[2] || {};
 		
-		// 如果 udp2raw 未安装，显示安装提示
+		// Check installation
 		if (!udp2rawInstalled) {
 			return E('div', { 'class': 'alert-message warning' }, [
 				E('h3', {}, _('Udp2raw Not Installed')),
@@ -82,587 +72,335 @@ return view.extend({
 		
 		m = new form.Map('udp2raw', _('UDP Tunnel Configuration'), 
 			_('UDP Tunnel Manager converts UDP traffic into encrypted FakeTCP/UDP/ICMP traffic using raw sockets. ' +
-			  'This helps bypass UDP firewalls and provides stable tunneling for VPN protocols like WireGuard.'));
+			  'It helps bypass UDP firewalls. Please ensure "Key", "Raw Mode", "Cipher Mode", and "Auth Mode" match on both sides.'));
 		
-		// ==================== 服务状态显示 ====================
+		// ==================== Service Status Logic ====================
 		var isRunning = false;
 		var runningCount = 0;
 		
-		// 安全检查 serviceStatus
 		try {
-			if (serviceStatus && 
-			    typeof serviceStatus === 'object' &&
-			    serviceStatus.udp2raw && 
-			    typeof serviceStatus.udp2raw === 'object' &&
-			    serviceStatus.udp2raw.instances &&
-			    typeof serviceStatus.udp2raw.instances === 'object') {
+			if (serviceStatus && serviceStatus.udp2raw && serviceStatus.udp2raw.instances) {
 				var instances = serviceStatus.udp2raw.instances;
-				var keys = Object.keys(instances);
-				if (keys && keys.length > 0) {
-					for (var i = 0; i < keys.length; i++) {
-						var key = keys[i];
-						if (instances[key] && instances[key].running) {
-							isRunning = true;
-							runningCount++;
-						}
+				for (var key in instances) {
+					if (instances[key].running) {
+						isRunning = true;
+						runningCount++;
 					}
 				}
 			}
-		} catch (e) {
-			console.log('Error checking service status:', e);
-			// 出错时保持默认值
-			isRunning = false;
-			runningCount = 0;
-		}
+		} catch (e) { console.error(e); }
 		
 		var statusColor = isRunning ? '#5cb85c' : '#d9534f';
 		var statusText = isRunning 
-			? _('Running') + ' (' + runningCount + ' ' + _('tunnels') + ')'
+			? _('Running') + ' (' + runningCount + ' ' + _('tunnels active') + ')'
 			: _('Stopped');
 		
-		// ==================== 安全警告区域 ====================
+		// ==================== Info & Warning Area ====================
 		m.description = E('div', {}, [
-			// 服务状态（使用表格对齐）
+			// Status Bar
 			E('div', { 'class': 'cbi-section', 'style': 'margin-bottom: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;' }, [
 				E('table', { 'style': 'width: auto;' }, [
 					E('tr', {}, [
-						E('td', { 'style': 'font-weight: bold; padding-right: 10px;' }, _('Service Status:')),
+						E('td', { 'style': 'font-weight: bold; padding-right: 10px; color: #333333;' }, _('Service Status:')),
 						E('td', {}, E('span', { 'style': 'color: ' + statusColor + '; font-weight: bold;' }, statusText))
 					])
 				])
 			]),
-			// 安全警告
+			// Safety Warning (Restored 4 points)
 			E('div', { 'class': 'alert-message warning', 'style': 'margin-bottom: 20px;' }, [
 				E('h4', { 'style': 'margin: 0 0 10px 0;' }, '⚠️ ' + _('Critical Safety Information')),
 				E('ul', { 'style': 'margin: 0; padding-left: 20px;' }, [
-					E('li', {}, _('FakeTCP mode REQUIRES iptables rules to block kernel TCP RST packets')),
-					E('li', {}, _('On OpenWrt, iptables rules may be cleared when network settings change')),
-					E('li', {}, _('The "Keep Iptables Rules" option is STRONGLY recommended for OpenWrt')),
-					E('li', {}, _('Password/Key, Raw Mode, Cipher Mode, and Auth Mode MUST match on both sides'))
+					E('li', {}, _('FakeTCP mode REQUIRES iptables rules to block kernel TCP RST packets.')),
+					E('li', {}, _('On OpenWrt, iptables rules may be cleared when network settings change.')),
+					E('li', {}, _('The "Keep Iptables Rules" option is STRONGLY recommended for OpenWrt.')),
+					E('li', {}, _('Server Mode: You MUST specify "Forward To" address (usually 127.0.0.1).'))
 				])
 			])
 		]);
 		
-		// ==================== 全局设置 ====================
-		// 注意：section 类型必须是 'general'，与 init.d 脚本匹配
+		// ==================== Global Settings ====================
 		s = m.section(form.TypedSection, 'general', _('General Settings'),
-			_('These settings apply to all tunnel instances.'));
+			_('Global settings for the udp2raw daemon.'));
 		s.anonymous = true;
 		s.addremove = false;
 		
-		// 启用开关
-		o = s.option(form.Flag, 'enabled', _('Enable'),
-			_('Master switch to enable/disable the UDP tunnel service.'));
-		o.default = '0';
+		// 1. Enable Service
+		o = s.option(form.Flag, 'enabled', _('Enable Service'),
+			_('Master switch. If disabled, no tunnels will run.'));
+		o.default = '1';
 		o.rmempty = false;
 		
-		// 活动隧道选择
-		o = s.option(form.MultiValue, 'active_tunnels', _('Active Tunnels'),
-			_('Select which tunnel instances to run. If empty, all enabled tunnels will run.'));
-		o.optional = true;
-		
-		// 安全地获取 tunnel sections
-		var tunnelSections = [];
-		try {
-			uci.sections('udp2raw', 'tunnel', function(section) {
-				if (section && section['.name']) {
-					tunnelSections.push(section);
-				}
-			});
-		} catch (e) {
-			console.log('Error loading tunnel sections:', e);
-			tunnelSections = [];
-		}
-		
-		// 添加选项值（即使没有 tunnel 也不会报错）
-		if (tunnelSections && tunnelSections.length > 0) {
-			for (var i = 0; i < tunnelSections.length; i++) {
-				var section = tunnelSections[i];
-				if (section && section['.name']) {
-					var label = section.alias || section['.name'];
-					var mode = section.mode === 'server' ? _('Server') : _('Client');
-					var status = section.disabled === '1' ? ' [' + _('Disabled') + ']' : '';
-					o.value(section['.name'], label + ' (' + mode + ')' + status);
-				}
-			}
-		}
-		
-		// 保持 iptables 规则（全局）
+		// 2. Keep Iptables Rules
 		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rules'),
-			_('Monitors and automatically restores iptables rules when cleared by system. Strongly recommended for OpenWrt.'));
+			_('Auto-restore iptables rules if cleared by system. Recommended.'));
 		o.default = '1';
-		o.rmempty = false;
-		
-		// 等待 iptables 锁（全局）
+
+		// 3. Wait for Iptables Lock (Restored)
 		o = s.option(form.Flag, 'wait_lock', _('Wait for Iptables Lock'),
-			_('Wait for iptables lock when adding rules. Requires iptables v1.4.20+.'));
+			_('Wait for xtables lock while invoking iptables. Prevents failures during boot.'));
 		o.default = '1';
-		
-		// 出错时重试（全局）
+
+		// 4. Retry on Error (Restored)
 		o = s.option(form.Flag, 'retry_on_error', _('Retry on Error'),
-			_('Allow udp2raw to start before network is fully initialized.'));
+			_('Allow starting even if network is not ready. Recommended for auto-start.'));
 		o.default = '1';
 		
-		// 日志级别
-		o = s.option(form.ListValue, 'log_level', _('Log Level'),
-			_('Verbosity of log output.'));
-		o.value('0', _('0 - Never'));
-		o.value('1', _('1 - Fatal'));
-		o.value('2', _('2 - Error'));
-		o.value('3', _('3 - Warning'));
-		o.value('4', _('4 - Info (Recommended)'));
-		o.value('5', _('5 - Debug'));
-		o.value('6', _('6 - Trace'));
+		// 5. Log Level
+		o = s.option(form.ListValue, 'log_level', _('Log Level'));
+		o.value('1', _('Fatal'));
+		o.value('2', _('Error'));
+		o.value('3', _('Warning'));
+		o.value('4', _('Info (Default)'));
 		o.default = '4';
 		
-		// ==================== 服务端实例 ====================
-		s = m.section(form.GridSection, 'tunnel', _('Server Instances'),
-			_('Server mode: Listen on a port and forward decrypted traffic to local service.'));
+		// ==================== 1. Server Instances (Top Priority) ====================
+		s = m.section(form.GridSection, 'server', _('Server Instances (-s)'),
+			_('<b>Server Mode:</b> OpenWrt listens for connections from remote clients.<br/>' +
+			  'Traffic Flow: Internet -> WAN Port -> [Decrypted] -> Forward To IP:Port.'));
 		s.anonymous = false;
 		s.addremove = true;
 		s.sortable = true;
 		s.nodescriptions = true;
-		s.addbtntitle = _('Add');
-		
-		// 只显示服务端实例
-		s.filter = function(section_id) {
-			if (!section_id) return false;
-			var mode = uci.get('udp2raw', section_id, 'mode');
-			return mode === 'server';
-		};
+		s.addbtntitle = _('Add Server');
 		
 		s.sectiontitle = function(section_id) {
-			if (!section_id) return _('Unknown');
 			var alias = uci.get('udp2raw', section_id, 'alias');
-			return alias || section_id;
+			return alias ? (alias + ' (Server)') : _('New Server');
 		};
 		
-		s.modaltitle = function(section_id) {
-			var alias = section_id ? (uci.get('udp2raw', section_id, 'alias') || section_id) : _('New');
-			return _('UDP Tunnel - Edit Server Instance') + ': ' + alias;
-		};
-		
-		// 添加新服务端实例
+		// Default values for new Server
 		s.handleAdd = function(ev) {
-			var section_id = uci.add('udp2raw', 'tunnel');
-			uci.set('udp2raw', section_id, 'mode', 'server');
-			uci.set('udp2raw', section_id, 'disabled', '0');
+			var section_id = uci.add('udp2raw', 'server');
+			uci.set('udp2raw', section_id, 'enabled', '1');
 			uci.set('udp2raw', section_id, 'local_addr', '0.0.0.0');
 			uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
-			uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
-			uci.set('udp2raw', section_id, 'auth_mode', 'hmac_sha1');
+			uci.set('udp2raw', section_id, 'cipher_mode', 'xor');
+			uci.set('udp2raw', section_id, 'auth_mode', 'simple');
 			uci.set('udp2raw', section_id, 'auto_rule', '1');
-			uci.set('udp2raw', section_id, 'seq_mode', '3');
 			return this.renderMoreOptionsModal(section_id);
 		};
+
+		// --- Tabs Definition ---
+		s.tab('basic', _('Basic Settings'));
+		s.tab('advanced', _('Advanced Settings'));
+
+		// --- Server: Table Columns (Optimized Widths) ---
 		
-		// ===== 服务端 - 表格列 =====
-		o = s.option(form.Value, 'alias', _('Alias'));
+		// 1. Enable
+		o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
+		o.default = '1';
+		o.editable = true;
+		o.width = '10%';
+		// FIX: Force writing '1' or '0' to config file, preventing fallback to default '0'
+		o.rmempty = false;
+		
+		// 2. Alias (Widened)
+		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
 		o.placeholder = 'My Server';
-		o.modalonly = false;
-		
-		o = s.option(form.Value, 'local_addr', _('Listen Address'));
-		o.datatype = 'ipaddr';
-		o.placeholder = '0.0.0.0';
-		o.default = '0.0.0.0';
-		o.modalonly = false;
-		
-		o = s.option(form.Value, 'local_port', _('Listen Port'));
+		o.rmempty = true;
+		o.width = '15%';
+
+		// 3. Listen Port
+		o = s.taboption('basic', form.Value, 'local_port', _('WAN Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.modalonly = false;
+		o.width = '10%';
 		
-		o = s.option(form.Value, 'remote_addr', _('Forward to Address'));
+		// 4. Forward Address
+		o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
 		o.datatype = 'host';
 		o.placeholder = '127.0.0.1';
 		o.rmempty = false;
-		o.modalonly = false;
+		o.width = '15%';
 		
-		o = s.option(form.Value, 'remote_port', _('Forward to Port'));
+		// 5. Forward Port
+		o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.modalonly = false;
-		
-		// ===== 服务端 - 模态框选项 =====
-		o = s.option(form.Value, 'alias', _('Alias'),
-			_('A friendly name for this tunnel instance.'));
-		o.placeholder = 'My Server';
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'disabled', _('Disable'),
-			_('Temporarily disable this tunnel instance.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'local_addr', _('Listen Address'),
-			_('IP address to listen on. Use 0.0.0.0 for all interfaces.'));
-		o.datatype = 'ipaddr';
-		o.placeholder = '0.0.0.0';
-		o.default = '0.0.0.0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'local_port', _('Listen Port'),
-			_('Port to listen for incoming raw tunnel connections.'));
-		o.datatype = 'port';
-		o.rmempty = false;
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'remote_addr', _('Forward to Address'),
-			_('Local service address to forward decrypted UDP traffic.'));
-		o.datatype = 'host';
-		o.placeholder = '127.0.0.1';
-		o.rmempty = false;
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'remote_port', _('Forward to Port'),
-			_('Local service port to forward decrypted UDP traffic.'));
-		o.datatype = 'port';
-		o.rmempty = false;
-		o.modalonly = true;
-		
-		o = s.option(form.ListValue, 'raw_mode', _('Raw Mode'),
-			_('Transport protocol. FakeTCP is recommended for bypassing firewalls.'));
-		o.value('faketcp', _('FakeTCP (Recommended)'));
-		o.value('udp', _('UDP'));
-		o.value('icmp', _('ICMP'));
-		o.value('easy-faketcp', _('Easy-FakeTCP'));
-		o.default = 'faketcp';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'key', _('Password'),
-			_('Encryption password. Must match on both client and server.'));
+		o.width = '10%';
+
+		// --- Server: Hidden Options (Modal Only) ---
+
+		// Password
+		o = s.taboption('basic', form.Value, 'key', _('Password (-k)'), 
+			_('Encryption password. Must match client configuration exactly.'));
 		o.password = true;
 		o.rmempty = false;
 		o.modalonly = true;
-		
-		o = s.option(form.ListValue, 'cipher_mode', _('Cipher Mode'),
-			_('Encryption algorithm. AES-128-CBC provides best security.'));
-		o.value('aes128cbc', _('AES-128-CBC (Recommended)'));
-		o.value('aes128cfb', _('AES-128-CFB'));
-		o.value('xor', _('XOR (Fast, Low Security)'));
-		o.value('none', _('None (Debug Only!)'));
-		o.default = 'aes128cbc';
+
+		// Listen Address
+		o = s.taboption('basic', form.Value, 'local_addr', _('WAN Listen Address (-l)'), 
+			_('Address to listen on. Use 0.0.0.0 for all interfaces.'));
+		o.datatype = 'ipaddr';
+		o.default = '0.0.0.0';
+		o.modalonly = true;
+
+		// Advanced Options (All Modal Only)
+		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), 
+			_('Transport protocol. FakeTCP is recommended for bypassing firewalls.'));
+		o.value('faketcp', 'FakeTCP (Recommended)');
+		o.value('udp', 'UDP');
+		o.value('icmp', 'ICMP');
+		o.default = 'faketcp';
 		o.modalonly = true;
 		
-		o = s.option(form.ListValue, 'auth_mode', _('Auth Mode'),
-			_('Authentication algorithm. HMAC-SHA1 provides best integrity protection.'));
-		o.value('hmac_sha1', _('HMAC-SHA1 (Recommended)'));
-		o.value('md5', _('MD5'));
-		o.value('crc32', _('CRC32 (Fast, Low Security)'));
-		o.value('simple', _('Simple (Weak)'));
-		o.value('none', _('None (Debug Only!)'));
-		o.default = 'hmac_sha1';
+		o = s.taboption('advanced', form.ListValue, 'cipher_mode', _('Cipher Mode'),
+			_('Encryption method. XOR is fast and usually sufficient.'));
+		o.value('aes128cbc', 'AES-128-CBC (Secure)');
+		o.value('xor', 'XOR (Fast)');
+		o.value('none', 'None');
+		o.default = 'xor';
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'auto_rule', _('Auto Add Iptables Rule'),
-			_('Automatically add iptables rules to block kernel TCP RST. Required for FakeTCP mode.'));
+		o = s.taboption('advanced', form.ListValue, 'auth_mode', _('Auth Mode'),
+			_('Authentication method. Simple is basic protection.'));
+		o.value('hmac_sha1', 'HMAC-SHA1 (Secure)');
+		o.value('simple', 'Simple (Basic)');
+		o.value('none', 'None');
+		o.default = 'simple';
+		o.modalonly = true;
+		
+		o = s.taboption('advanced', form.Flag, 'auto_rule', _('Auto Add Iptables Rule (-a)'),
+			_('Automatically add iptables rules to block kernel TCP processing. Required for FakeTCP.'));
 		o.default = '1';
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rule'),
-			_('Monitor iptables and auto re-add rules if cleared. Recommended for OpenWrt.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.ListValue, 'seq_mode', _('Sequence Mode'),
-			_('FakeTCP sequence number simulation mode. Mode 3 simulates real TCP behavior.'));
-		o.value('0', _('0 - Static (no increment)'));
-		o.value('1', _('1 - Increment every packet'));
-		o.value('2', _('2 - Random increment (~3 packets)'));
-		o.value('3', _('3 - Simulate real TCP (Recommended)'));
-		o.value('4', _('4 - Like 3, no Window Scale'));
-		o.default = '3';
-		o.modalonly = true;
-		o.depends('raw_mode', 'faketcp');
-		o.depends('raw_mode', 'easy-faketcp');
-		
-		o = s.option(form.Value, 'lower_level', _('Lower Level'),
-			_('Send packets at OSI layer 2 to bypass local iptables. Format: eth0#00:11:22:33:44:55 or auto.'));
-		o.placeholder = 'auto';
+		o = s.taboption('advanced', form.DynamicList, 'extra_args', _('Extra Arguments'),
+			_('Additional command line arguments (e.g. --seq-mode 4).'));
 		o.optional = true;
 		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'disable_anti_replay', _('Disable Anti-Replay'),
-			_('Disable replay attack protection. NOT recommended for security reasons.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'fix_gro', _('Fix GRO'),
-			_('Try to fix huge packets caused by Generic Receive Offload.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'mtu_warn', _('MTU Warning Threshold'),
-			_('Warn when packet size exceeds this value. Default: 1375.'));
-		o.datatype = 'range(100,1500)';
-		o.placeholder = '1375';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'sock_buf', _('Socket Buffer Size (KB)'),
-			_('Socket buffer size in KB. Range: 10-10240, Default: 1024.'));
-		o.datatype = 'range(10,10240)';
-		o.placeholder = '1024';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'force_sock_buf', _('Force Socket Buffer'),
-			_('Bypass system limitation when setting socket buffer size.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'dev', _('Bind Device'),
-			_('Bind raw socket to specific network interface for better performance.'));
-		o.placeholder = 'eth0';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'disable_bpf', _('Disable BPF'),
-			_('Disable kernel space BPF filter. Only use if you suspect a bug.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'hb_len', _('Heartbeat Length'),
-			_('Length of heartbeat packets (0-1500 bytes).'));
-		o.datatype = 'range(0,1500)';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.DynamicList, 'extra_args', _('Extra Arguments'),
-			_('Additional command line arguments not covered by the GUI.'));
-		o.optional = true;
-		o.modalonly = true;
-		
-		// ==================== 客户端实例 ====================
-		s = m.section(form.GridSection, 'tunnel', _('Client Instances'),
-			_('Client mode: Connect to remote server and forward local UDP traffic.'));
+
+		// ==================== 2. Client Instances ====================
+		s = m.section(form.GridSection, 'client', _('Client Instances (-c)'),
+			_('<b>Client Mode:</b> OpenWrt connects to a remote udp2raw server (VPS).<br/>' +
+			  'Traffic Flow: App -> Local Port -> [Encrypted] -> Forward To VPS IP:Port.'));
 		s.anonymous = false;
 		s.addremove = true;
 		s.sortable = true;
 		s.nodescriptions = true;
-		s.addbtntitle = _('Add');
-		
-		// 只显示客户端实例
-		s.filter = function(section_id) {
-			if (!section_id) return false;
-			var mode = uci.get('udp2raw', section_id, 'mode');
-			return mode !== 'server';
-		};
+		s.addbtntitle = _('Add Client');
 		
 		s.sectiontitle = function(section_id) {
-			if (!section_id) return _('Unknown');
 			var alias = uci.get('udp2raw', section_id, 'alias');
-			return alias || section_id;
+			return alias ? (alias + ' (Client)') : _('New Client');
 		};
 		
-		s.modaltitle = function(section_id) {
-			var alias = section_id ? (uci.get('udp2raw', section_id, 'alias') || section_id) : _('New');
-			return _('UDP Tunnel - Edit Client Instance') + ': ' + alias;
-		};
-		
-		// 添加新客户端实例
 		s.handleAdd = function(ev) {
-			var section_id = uci.add('udp2raw', 'tunnel');
-			uci.set('udp2raw', section_id, 'mode', 'client');
-			uci.set('udp2raw', section_id, 'disabled', '0');
+			var section_id = uci.add('udp2raw', 'client');
+			uci.set('udp2raw', section_id, 'enabled', '1');
 			uci.set('udp2raw', section_id, 'local_addr', '127.0.0.1');
+			uci.set('udp2raw', section_id, 'local_port', '3333');
 			uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
-			uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
-			uci.set('udp2raw', section_id, 'auth_mode', 'hmac_sha1');
+			uci.set('udp2raw', section_id, 'cipher_mode', 'xor');
+			uci.set('udp2raw', section_id, 'auth_mode', 'simple');
 			uci.set('udp2raw', section_id, 'auto_rule', '1');
 			uci.set('udp2raw', section_id, 'seq_mode', '3');
 			return this.renderMoreOptionsModal(section_id);
 		};
+
+		// --- Tabs Definition ---
+		s.tab('basic', _('Basic Settings'));
+		s.tab('advanced', _('Advanced Settings'));
+
+		// --- Client: Table Columns (Optimized Widths) ---
 		
-		// ===== 客户端 - 表格列 =====
-		o = s.option(form.Value, 'alias', _('Alias'));
-		o.placeholder = 'My Client';
-		o.modalonly = false;
-		
-		o = s.option(form.Value, 'local_addr', _('Listen Address'));
-		o.datatype = 'ipaddr';
-		o.placeholder = '127.0.0.1';
-		o.default = '127.0.0.1';
-		o.modalonly = false;
-		
-		o = s.option(form.Value, 'local_port', _('Listen Port'));
-		o.datatype = 'port';
+		// 1. Enable
+		o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
+		o.default = '1';
+		o.editable = true;
+		o.width = '10%';
+		// FIX: Force writing '1' or '0' to config file
 		o.rmempty = false;
-		o.modalonly = false;
 		
-		o = s.option(form.Value, 'remote_addr', _('Remote Address'));
+		// 2. Alias (Widened)
+		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
+		o.placeholder = 'My VPS';
+		o.width = '15%';
+		
+		// 3. VPS Address
+		o = s.taboption('basic', form.Value, 'remote_addr', _('VPS Address'));
 		o.datatype = 'host';
 		o.rmempty = false;
-		o.modalonly = false;
+		o.width = '15%';
 		
-		o = s.option(form.Value, 'remote_port', _('Remote Port'));
+		// 4. VPS Port
+		o = s.taboption('basic', form.Value, 'remote_port', _('VPS Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.modalonly = false;
+		o.width = '10%';
 		
-		// ===== 客户端 - 模态框选项 =====
-		o = s.option(form.Value, 'alias', _('Alias'),
-			_('A friendly name for this tunnel instance.'));
-		o.placeholder = 'My Client';
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'disabled', _('Disable'),
-			_('Temporarily disable this tunnel instance.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'local_addr', _('Listen Address'),
-			_('Local IP address to listen on for UDP traffic to tunnel.'));
-		o.datatype = 'ipaddr';
-		o.placeholder = '127.0.0.1';
-		o.default = '127.0.0.1';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'local_port', _('Listen Port'),
-			_('Local port to listen for UDP traffic to tunnel.'));
+		// 5. Local Port
+		o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.modalonly = true;
+		o.width = '10%';
+
+		// --- Client: Hidden Options (Modal Only) ---
 		
-		o = s.option(form.Value, 'remote_addr', _('Remote Server Address'),
-			_('IP address or hostname of the remote udp2raw server.'));
-		o.datatype = 'host';
-		o.rmempty = false;
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'remote_port', _('Remote Server Port'),
-			_('Port of the remote udp2raw server.'));
-		o.datatype = 'port';
-		o.rmempty = false;
-		o.modalonly = true;
-		
-		o = s.option(form.ListValue, 'raw_mode', _('Raw Mode'),
-			_('Transport protocol. Must match server configuration.'));
-		o.value('faketcp', _('FakeTCP (Recommended)'));
-		o.value('udp', _('UDP'));
-		o.value('icmp', _('ICMP'));
-		o.value('easy-faketcp', _('Easy-FakeTCP'));
-		o.default = 'faketcp';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'key', _('Password'),
-			_('Encryption password. Must match server configuration.'));
+		// Password
+		o = s.taboption('basic', form.Value, 'key', _('Password (-k)'), 
+			_('Encryption password. Must match server configuration exactly.'));
 		o.password = true;
 		o.rmempty = false;
 		o.modalonly = true;
 		
-		o = s.option(form.ListValue, 'cipher_mode', _('Cipher Mode'),
-			_('Encryption algorithm. Must match server configuration.'));
-		o.value('aes128cbc', _('AES-128-CBC (Recommended)'));
-		o.value('aes128cfb', _('AES-128-CFB'));
-		o.value('xor', _('XOR (Fast, Low Security)'));
-		o.value('none', _('None (Debug Only!)'));
-		o.default = 'aes128cbc';
+		// Local Address
+		o = s.taboption('basic', form.Value, 'local_addr', _('Local Listen Address (-l)'), 
+			_('IP to bind locally. Use 127.0.0.1 for local apps (WireGuard/OpenVPN).'));
+		o.datatype = 'ipaddr';
+		o.default = '127.0.0.1';
+		o.modalonly = true;
+
+		// Advanced Options (All Modal Only)
+		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), _('Transport protocol.'));
+		o.value('faketcp', 'FakeTCP (Recommended)');
+		o.value('udp', 'UDP');
+		o.value('icmp', 'ICMP');
+		o.default = 'faketcp';
 		o.modalonly = true;
 		
-		o = s.option(form.ListValue, 'auth_mode', _('Auth Mode'),
-			_('Authentication algorithm. Must match server configuration.'));
-		o.value('hmac_sha1', _('HMAC-SHA1 (Recommended)'));
-		o.value('md5', _('MD5'));
-		o.value('crc32', _('CRC32 (Fast, Low Security)'));
-		o.value('simple', _('Simple (Weak)'));
-		o.value('none', _('None (Debug Only!)'));
-		o.default = 'hmac_sha1';
+		o = s.taboption('advanced', form.ListValue, 'cipher_mode', _('Cipher Mode'));
+		o.value('aes128cbc', 'AES-128-CBC');
+		o.value('xor', 'XOR (Fast)');
+		o.value('none', 'None');
+		o.default = 'xor';
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'auto_rule', _('Auto Add Iptables Rule'),
-			_('Automatically add iptables rules. Required for FakeTCP mode.'));
-		o.default = '1';
+		o = s.taboption('advanced', form.ListValue, 'auth_mode', _('Auth Mode'));
+		o.value('hmac_sha1', 'HMAC-SHA1');
+		o.value('simple', 'Simple');
+		o.value('none', 'None');
+		o.default = 'simple';
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rule'),
-			_('Monitor iptables and auto re-add rules if cleared.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.ListValue, 'seq_mode', _('Sequence Mode'),
-			_('FakeTCP sequence number mode. Must match server configuration.'));
-		o.value('0', _('0 - Static (no increment)'));
-		o.value('1', _('1 - Increment every packet'));
-		o.value('2', _('2 - Random increment (~3 packets)'));
-		o.value('3', _('3 - Simulate real TCP (Recommended)'));
-		o.value('4', _('4 - Like 3, no Window Scale'));
-		o.default = '3';
-		o.modalonly = true;
-		o.depends('raw_mode', 'faketcp');
-		o.depends('raw_mode', 'easy-faketcp');
-		
-		o = s.option(form.Value, 'lower_level', _('Lower Level'),
-			_('Send packets at OSI layer 2. Format: eth0#00:11:22:33:44:55 or auto.'));
-		o.placeholder = 'auto';
-		o.optional = true;
-		o.modalonly = true;
-		
-		// ===== 客户端专用选项 =====
-		o = s.option(form.Value, 'source_ip', _('Source IP'),
-			_('Force source IP for raw socket. Client only option.'));
+		o = s.taboption('advanced', form.Value, 'source_ip', _('Source IP (--source-ip)'),
+			_('Force source-ip for raw socket. Leave empty unless necessary.'));
 		o.datatype = 'ipaddr';
 		o.optional = true;
 		o.modalonly = true;
 		
-		o = s.option(form.Value, 'source_port', _('Source Port'),
-			_('Force source port for raw socket. Disables port changing during reconnection. Client only option.'));
+		o = s.taboption('advanced', form.Value, 'source_port', _('Source Port (--source-port)'),
+			_('Force source-port for raw socket. Disables port changing. Leave empty unless necessary.'));
 		o.datatype = 'port';
 		o.optional = true;
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'disable_anti_replay', _('Disable Anti-Replay'),
-			_('Disable replay attack protection. NOT recommended.'));
-		o.default = '0';
+		o = s.taboption('advanced', form.Flag, 'auto_rule', _('Auto Add Iptables Rule (-a)'),
+			_('Automatically manage iptables rules.'));
+		o.default = '1';
 		o.modalonly = true;
 		
-		o = s.option(form.Flag, 'fix_gro', _('Fix GRO'),
-			_('Try to fix huge packets caused by GRO.'));
-		o.default = '0';
+		o = s.taboption('advanced', form.ListValue, 'seq_mode', _('Sequence Mode'), _('FakeTCP behavior simulation.'));
+		o.value('3', _('3 - Simulate real TCP (Recommended)'));
+		o.value('4', _('4 - Like 3, no Window Scale'));
+		o.default = '3';
+		o.depends('raw_mode', 'faketcp');
 		o.modalonly = true;
 		
-		o = s.option(form.Value, 'mtu_warn', _('MTU Warning Threshold'),
-			_('Warn when packet size exceeds this value.'));
-		o.datatype = 'range(100,1500)';
-		o.placeholder = '1375';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'sock_buf', _('Socket Buffer Size (KB)'),
-			_('Socket buffer size in KB. Range: 10-10240.'));
-		o.datatype = 'range(10,10240)';
-		o.placeholder = '1024';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'force_sock_buf', _('Force Socket Buffer'),
-			_('Bypass system limitation for socket buffer.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'dev', _('Bind Device'),
-			_('Bind raw socket to specific network interface.'));
-		o.placeholder = 'eth0';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.Flag, 'disable_bpf', _('Disable BPF'),
-			_('Disable kernel space BPF filter.'));
-		o.default = '0';
-		o.modalonly = true;
-		
-		o = s.option(form.Value, 'hb_len', _('Heartbeat Length'),
-			_('Length of heartbeat packets (0-1500 bytes).'));
-		o.datatype = 'range(0,1500)';
-		o.optional = true;
-		o.modalonly = true;
-		
-		o = s.option(form.DynamicList, 'extra_args', _('Extra Arguments'),
-			_('Additional command line arguments.'));
+		o = s.taboption('advanced', form.DynamicList, 'extra_args', _('Extra Arguments'));
 		o.optional = true;
 		o.modalonly = true;
 		
 		return m.render();
 	}
-
 });
