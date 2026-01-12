@@ -5,27 +5,24 @@
  * Displays real-time tunnel status, connection info, and diagnostics
  * 
  * @module luci-app-udp-tunnel/status
- * @version 1.3.1
- * @date 2026-01-10
+ * @version 2.7
+ * @date 2026-01-12
  * 
  * Changelog:
- *   v1.3.1 - Added defensive null checks for all data processing
- *          - Fixed potential errors when no tunnels configured
- *          - Improved ANSI stripping robustness
- *   v1.3.0 - Fixed ANSI escape code filtering for binary version display
- *          - Fixed status alignment using tables
- *          - Removed bullet points from status display
- *          - Fixed color scheme (Running=green, Stopped/Disabled=red)
- *          - Updated field names to match init.d (remote_addr/remote_port)
+ *   v2.7   - Fixed Iptables Rules to display ACTUAL chain names (e.g. udp2rawDwrW_...) instead of count
+ *          - Fixed "Last updated" text color by removing inline styles completely
+ *   v2.6   - Reverted label to "Iptables Rules"
+ *          - Enhanced Iptables detection
+ *   v2.5   - Improved "Core Binary" detection logic
  */
 
 'use strict';
 'require view';
 'require fs';
 'require ui';
-'require poll';
 'require uci';
 'require rpc';
+'require poll';
 
 var callServiceList = rpc.declare({
 	object: 'service',
@@ -36,470 +33,384 @@ var callServiceList = rpc.declare({
 
 return view.extend({
 	title: _('UDP Tunnel Status'),
-	
-	/**
-	 * 过滤 ANSI 转义码
-	 * 修复 Binary Status 显示 [32m[2026-01-10... 等乱码问题
-	 */
-	stripAnsi: function(str) {
-		if (str === null || str === undefined) return '';
-		if (typeof str !== 'string') {
-			try {
-				str = String(str);
-			} catch (e) {
-				return '';
-			}
-		}
-		// 移除所有 ANSI 转义序列
-		return str
-			.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')  // 标准 ANSI
-			.replace(/\x1B\][^\x07]*\x07/g, '')      // OSC 序列
-			.replace(/\[([0-9;]*)m/g, '')            // 残留的颜色码
-			.replace(/\x1B/g, '')                    // 残留的 ESC 字符
-			.trim();
+
+	pollInterval: 5,
+
+	cleanText: function(str) {
+		if (!str) return '';
+		return String(str).replace(/\x1B[[0-9;]*[a-zA-Z]/g, '').trim();
 	},
-	
-	/**
-	 * 获取进程运行状态
-	 */
+
 	getServiceStatus: function() {
-		return L.resolveDefault(callServiceList('udp2raw'), null).then(function(res) {
+		return L.resolveDefault(callServiceList('udp2raw'), {}).then(function(res) {
+			var instances = {};
 			var isRunning = false;
-			var instances = [];
 			
-			try {
-				if (res && 
-				    typeof res === 'object' &&
-				    res.udp2raw && 
-				    typeof res.udp2raw === 'object' &&
-				    res.udp2raw.instances &&
-				    typeof res.udp2raw.instances === 'object') {
-					var keys = Object.keys(res.udp2raw.instances);
-					if (keys && keys.length > 0) {
-						for (var i = 0; i < keys.length; i++) {
-							var key = keys[i];
-							var inst = res.udp2raw.instances[key];
-							if (inst && inst.running) {
-								isRunning = true;
-								instances.push({
-									name: key,
-									pid: inst.pid || 'N/A',
-									command: (inst.command && Array.isArray(inst.command)) 
-										? inst.command.join(' ') 
-										: 'N/A'
-								});
-							}
-						}
+			if (res && res.udp2raw && res.udp2raw.instances) {
+				for (var key in res.udp2raw.instances) {
+					var inst = res.udp2raw.instances[key];
+					if (inst && inst.running) {
+						isRunning = true;
+						instances[key] = {
+							pid: inst.pid,
+							command: Array.isArray(inst.command) ? inst.command.join(' ') : ''
+						};
 					}
 				}
-			} catch (e) {
-				console.error('Error parsing service status:', e);
 			}
-			
-			return {
-				running: isRunning,
-				instances: instances
-			};
+			return { running: isRunning, instances: instances };
 		});
 	},
-	
-	/**
-	 * 获取配置的隧道列表
-	 * 注意：使用 remote_addr/remote_port 与 init.d 保持一致
-	 */
+
 	getTunnelConfigs: function() {
 		return uci.load('udp2raw').then(function() {
 			var tunnels = [];
-			var globalEnabled = false;
-			
-			try {
-				globalEnabled = uci.get('udp2raw', 'general', 'enabled') === '1';
-			} catch (e) {
-				console.log('Error reading global enabled state:', e);
-			}
-			
-			try {
-				uci.sections('udp2raw', 'tunnel', function(s) {
-					if (s && s['.name']) {
-						tunnels.push({
-							id: s['.name'],
-							alias: s.alias || s['.name'],
-							mode: s.mode || 'client',
-							disabled: s.disabled === '1',
-							local: (s.local_addr || '0.0.0.0') + ':' + (s.local_port || '?'),
-							remote: (s.remote_addr || '?') + ':' + (s.remote_port || '?'),
-							raw_mode: s.raw_mode || 'faketcp',
-							cipher: s.cipher_mode || 'aes128cbc',
-							auth: s.auth_mode || 'hmac_sha1',
-							auto_rule: s.auto_rule !== '0'
-						});
-					}
+			var sections = uci.sections('udp2raw');
+
+			sections.forEach(function(s) {
+				if (s['.type'] === 'general') return;
+
+				var mode = 'client';
+				var localStr = '?';
+				var remoteStr = '?';
+
+				if (s['.type'] === 'server') {
+					mode = 'server';
+					var listenPort = s.listen_port || s.local_port || '29900'; 
+					var target = s.forward_to || s.target || s.target_addr || '127.0.0.1';
+					var targetPort = s.target_port || s.forward_port || '';
+					localStr = '0.0.0.0:' + listenPort;
+					remoteStr = target + (targetPort ? ':' + targetPort : '');
+				} else {
+					mode = 'client';
+					var localIP = s.local_addr || '127.0.0.1';
+					var localPort = s.local_port || '3333';
+					var serverIP = s.server_addr || s.remote_addr || '127.0.0.1';
+					var serverPort = s.server_port || s.remote_port || '29900';
+					localStr = localIP + ':' + localPort;
+					remoteStr = serverIP + ':' + serverPort;
+				}
+
+				tunnels.push({
+					id: s['.name'],
+					alias: s.alias || s['.name'],
+					mode: mode, 
+					disabled: s.enabled === '0' || s.disabled === '1',
+					local: localStr,
+					remote: remoteStr,
+					raw_mode: s.raw_mode || 'faketcp'
 				});
-			} catch (e) {
-				console.log('Error loading tunnel sections:', e);
-			}
-			
-			return {
-				globalEnabled: globalEnabled,
-				tunnels: tunnels
-			};
+			});
+			return tunnels;
 		});
 	},
-	
-	/**
-	 * 读取系统日志中的 udp2raw 相关条目
-	 */
+
 	getRecentLogs: function() {
 		var self = this;
-		return L.resolveDefault(fs.exec('/usr/bin/logread', ['-e', 'udp2raw']), null)
-			.then(function(res) {
-				if (res && res.code === 0 && res.stdout) {
-					var lines = res.stdout.trim().split('\n').slice(-100);
-					return lines.filter(function(line) {
-						return line && line.length > 0;
-					}).map(function(line) {
-						// 过滤每行的 ANSI 码
-						return self.stripAnsi(line);
-					});
-				}
-				return [];
-			});
-	},
-	
-	/**
-	 * 检查 iptables 规则状态
-	 */
-	checkIptablesRules: function() {
-		return L.resolveDefault(fs.exec('/usr/sbin/iptables', ['-L', 'INPUT', '-n', '-v']), null)
-			.then(function(res) {
-				var hasUdp2rawRules = false;
-				
-				if (res && res.code === 0 && res.stdout) {
-					// 查找 DROP RST 规则（udp2raw 添加的）
-					if (res.stdout.indexOf('RST') !== -1 || 
-					    res.stdout.indexOf('reject-with') !== -1 ||
-					    res.stdout.indexOf('DROP') !== -1) {
-						hasUdp2rawRules = true;
-					}
-				}
-				
-				return {
-					present: hasUdp2rawRules,
-					raw: (res && res.stdout) ? res.stdout : ''
-				};
-			});
-	},
-	
-	/**
-	 * 检查 udp2raw 二进制文件
-	 */
-	checkBinary: function() {
-		var self = this;
-		return L.resolveDefault(fs.stat('/usr/bin/udp2raw'), null).then(function(stat) {
-			if (stat) {
-				return L.resolveDefault(fs.exec('/usr/bin/udp2raw', ['--version']), null).then(function(res) {
-					var version = 'Unknown';
-					if (res && res.stdout) {
-						// 过滤 ANSI 转义码并提取版本信息
-						var cleaned = self.stripAnsi(res.stdout);
-						if (cleaned) {
-							var lines = cleaned.split('\n');
-							for (var i = 0; i < lines.length; i++) {
-								var line = lines[i].trim();
-								if (line.length > 0) {
-									// 取第一个非空行作为版本
-									version = line;
-									break;
-								}
-							}
-						}
-					}
-					return {
-						installed: true,
-						version: version
-					};
-				});
+		return fs.exec('/sbin/logread', ['-e', 'udp2raw']).then(function(res) {
+			var output = res.stdout || '';
+			if (!output && res.code !== 0) {
+				return fs.exec('/bin/sh', ['-c', 'logread | grep udp2raw | tail -n 150']);
 			}
+			return res;
+		}).then(function(res) {
+			var logContent = res.stdout || '';
+			if (!logContent) return [];
+			var lines = logContent.trim().split('\n');
+			return lines.slice(-150).map(self.cleanText).reverse();
+		}).catch(function() {
+			return [];
+		});
+	},
+
+	getVersion: function() {
+		var checkBin = function(path) {
+			return fs.exec(path, ['-h']).then(function(res) {
+				var output = (res.stdout || '') + (res.stderr || '');
+				var match = output.match(/git\s*version\s*:?\s*([a-f0-9]+)/i);
+				if (!match) {
+					match = output.match(/version\s*:?\s*([^\s,]+)/i);
+				}
+				if (match && match[1]) return { installed: true, version: match[1] };
+				if (output.length > 10) return { installed: true, version: 'Unknown' };
+				throw new Error('No output');
+			});
+		};
+
+		return checkBin('/usr/bin/udp2raw').catch(function() {
+			return fs.exec('/bin/sh', ['-c', 'which udp2raw']).then(function(res) {
+				var p = (res.stdout || '').trim();
+				if (p) return checkBin(p);
+				throw new Error('Not found');
+			});
+		}).catch(function() {
 			return { installed: false, version: null };
 		});
 	},
-	
+
 	/**
-	 * 渲染隧道状态表格
+	 * 5. 检查 iptables (v2.7: 修复，直接显示 Chain 名称)
 	 */
-	renderStatusTable: function(status, configData) {
-		var tunnels = (configData && configData.tunnels) ? configData.tunnels : [];
-		
-		var table = E('table', { 'class': 'table cbi-section-table' }, [
-			E('tr', { 'class': 'tr table-titles' }, [
-				E('th', { 'class': 'th' }, _('Name')),
-				E('th', { 'class': 'th' }, _('Mode')),
-				E('th', { 'class': 'th' }, _('Status')),
-				E('th', { 'class': 'th' }, _('Local')),
-				E('th', { 'class': 'th' }, _('Remote')),
-				E('th', { 'class': 'th' }, _('Protocol')),
-				E('th', { 'class': 'th' }, _('PID'))
-			])
-		]);
-		
-		if (!tunnels || tunnels.length === 0) {
-			var row = E('tr', { 'class': 'tr placeholder' }, [
-				E('td', { 'class': 'td', 'colspan': '7', 'style': 'text-align: center;' }, 
-					E('em', {}, _('No tunnels configured. Go to Configuration tab to add one.')))
-			]);
-			table.appendChild(row);
-			return table;
-		}
-		
-		var instances = (status && status.instances) ? status.instances : [];
-		var globalEnabled = configData ? configData.globalEnabled : false;
-		
-		tunnels.forEach(function(t) {
-			var isRunning = false;
-			var pid = '-';
+	checkIptables: function() {
+		return fs.exec('/usr/sbin/iptables-save').then(function(res) {
+			var rawOutput = res.stdout || '';
+			var statusText = _('No rules detected');
+			var statusColor = '#f0ad4e'; // orange
+			var present = false;
+
+			// 提取所有 :udp2raw 开头的字符串 (例如 :udp2rawDwrW_e76d91a7_C0)
+			// 正则解释: 匹配冒号开头，后面跟着 udp2raw，然后是非空字符，直到遇到空格或换行
+			var chainMatches = rawOutput.match(/:udp2raw[^\s]*/g);
 			
-			// 匹配运行中的实例
-			for (var i = 0; i < instances.length; i++) {
-				if (instances[i] && instances[i].name === t.id) {
-					isRunning = true;
-					pid = instances[i].pid || '-';
-					break;
-				}
+			if (chainMatches && chainMatches.length > 0) {
+				present = true;
+				statusColor = '#5cb85c';
+				
+				// 去掉前面的冒号
+				var chainNames = chainMatches.map(function(s) { return s.substring(1); });
+				// 拼接显示，如果有多个，用逗号分隔
+				statusText = _('Active: ') + chainNames.join(', ');
+				
+			} else if (rawOutput.indexOf('udp2raw') !== -1) {
+				// 兜底：虽然没匹配到 Chain 定义，但有规则引用
+				present = true;
+				statusText = _('Active (Rules Detected)');
+				statusColor = '#5cb85c';
+			} else if (rawOutput.indexOf('DROP') !== -1 && rawOutput.indexOf('RST') !== -1) {
+				present = true;
+				statusText = _('Active (RST Blocking Detected)');
+				statusColor = '#5cb85c';
 			}
-			
-			var statusText, statusColor;
-			
-			if (!globalEnabled) {
-				statusText = _('Service Disabled');
-				statusColor = '#d9534f';  // 红色
-			} else if (t.disabled) {
-				statusText = _('Disabled');
-				statusColor = '#999999';  // 灰色
-			} else if (isRunning) {
-				statusText = _('Running');
-				statusColor = '#5cb85c';  // 绿色
-			} else {
-				statusText = _('Stopped');
-				statusColor = '#d9534f';  // 红色
-			}
-			
-			var statusBadge = E('span', { 
-				'style': 'color: ' + statusColor + '; font-weight: bold;'
-			}, statusText);
-			
-			var modeLabel = t.mode === 'server' ? _('Server') : _('Client');
-			var protocolInfo = (t.raw_mode || 'faketcp') + ' / ' + (t.cipher || 'aes128cbc');
-			
-			var row = E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td' }, E('strong', {}, t.alias || t.id)),
-				E('td', { 'class': 'td' }, modeLabel),
-				E('td', { 'class': 'td' }, statusBadge),
-				E('td', { 'class': 'td' }, E('code', { 'style': 'font-size: 12px;' }, t.local || '-')),
-				E('td', { 'class': 'td' }, E('code', { 'style': 'font-size: 12px;' }, t.remote || '-')),
-				E('td', { 'class': 'td', 'style': 'font-size: 12px;' }, protocolInfo),
-				E('td', { 'class': 'td' }, pid)
-			]);
-			
-			table.appendChild(row);
+
+			return { present: present, text: statusText, color: statusColor };
+		}).catch(function() { 
+			return { present: false, text: _('Check failed'), color: '#d9534f' }; 
 		});
-		
-		return table;
 	},
-	
-	/**
-	 * 渲染诊断信息
-	 */
-	renderDiagnostics: function(iptablesInfo, binaryInfo) {
-		var binaryStatus, binaryColor;
-		
-		if (binaryInfo && binaryInfo.installed) {
-			binaryStatus = '✓ ' + _('Installed') + ' - ' + (binaryInfo.version || 'Unknown');
-			binaryColor = '#5cb85c';
-		} else {
-			binaryStatus = '✗ ' + _('Not found at /usr/bin/udp2raw');
-			binaryColor = '#d9534f';
-		}
-		
-		var iptablesStatus, iptablesColor;
-		if (iptablesInfo && iptablesInfo.present) {
-			iptablesStatus = '✓ ' + _('Rules detected (RST blocking active)');
-			iptablesColor = '#5cb85c';
-		} else {
-			iptablesStatus = '⚠ ' + _('No rules detected - will be added when tunnel starts');
-			iptablesColor = '#f0ad4e';
-		}
-		
-		var diagTable = E('table', { 'class': 'table', 'style': 'width: 100%;' }, [
-			E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td', 'style': 'width: 180px; font-weight: bold; vertical-align: top;' }, 
-					_('Binary Status:')),
-				E('td', { 'class': 'td' }, 
-					E('span', { 'style': 'color: ' + binaryColor + ';' }, binaryStatus))
-			]),
-			E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td', 'style': 'width: 180px; font-weight: bold; vertical-align: top;' }, 
-					_('Iptables Rules:')),
-				E('td', { 'class': 'td' }, 
-					E('span', { 'style': 'color: ' + iptablesColor + ';' }, iptablesStatus))
-			]),
-			E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td', 'style': 'width: 180px; font-weight: bold; vertical-align: top;' }, 
-					_('Safety Tips:')),
-				E('td', { 'class': 'td' }, [
-					E('ul', { 'style': 'margin: 0; padding-left: 20px; color: #666;' }, [
-						E('li', {}, _('FakeTCP mode requires iptables rules to block kernel TCP RST')),
-						E('li', {}, _('Use "Keep Iptables Rules" option for OpenWrt stability')),
-						E('li', {}, _('Ensure password and modes match on both client and server')),
-						E('li', {}, _('For WireGuard: add route exception to prevent traffic loop'))
-					])
-				])
-			])
-		]);
-		
-		return E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('System Diagnostics')),
-			diagTable
-		]);
-	},
-	
-	/**
-	 * 渲染日志区域
-	 */
-	renderLogs: function(logs) {
-		var logArray = (logs && Array.isArray(logs)) ? logs : [];
-		var logText = logArray.length > 0 
-			? logArray.join('\n')
-			: _('No udp2raw logs found in system log.');
-		
-		return E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('Recent Logs')),
-			E('p', { 'style': 'font-size: 12px; color: #666;' }, 
-				_('Last 100 log entries from system log (logread -e udp2raw)')),
-			E('textarea', {
-				'id': 'log-textarea',
-				'readonly': 'readonly',
-				'style': 'width: 100%; height: 300px; font-family: monospace; font-size: 11px; ' +
-				         'background: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #333; ' +
-				         'border-radius: 4px;',
-				'wrap': 'off',
-				'spellcheck': 'false'
-			}, logText),
-			E('div', { 'style': 'margin-top: 10px;' }, [
-				E('button', {
-					'class': 'cbi-button cbi-button-action',
-					'click': function() {
-						var textarea = document.getElementById('log-textarea');
-						if (textarea) {
-							textarea.scrollTop = textarea.scrollHeight;
-						}
-					}
-				}, _('Scroll to Bottom')),
-				E('span', {}, ' '),
-				E('button', {
-					'class': 'cbi-button',
-					'click': function() {
-						location.reload();
-					}
-				}, _('Refresh'))
-			])
-		]);
-	},
-	
-	/**
-	 * 主加载函数
-	 */
-	load: function() {
+
+	fetchStatusData: function() {
 		return Promise.all([
 			this.getServiceStatus(),
 			this.getTunnelConfigs(),
-			this.checkIptablesRules(),
-			this.getRecentLogs(),
-			this.checkBinary()
+			this.getVersion(),
+			this.checkIptables()
 		]);
 	},
-	
-	render: function(data) {
-		// 防御性检查：确保 data 是数组
-		if (!data || !Array.isArray(data)) {
-			data = [
-				{ running: false, instances: [] },
-				{ globalEnabled: false, tunnels: [] },
-				{ present: false, raw: '' },
-				[],
-				{ installed: false, version: null }
-			];
-		}
-		
-		var status = data[0] || { running: false, instances: [] };
-		var configData = data[1] || { globalEnabled: false, tunnels: [] };
-		var iptablesInfo = data[2] || { present: false, raw: '' };
-		var logs = data[3] || [];
-		var binaryInfo = data[4] || { installed: false, version: null };
-		
-		var globalStatusText, globalStatusColor;
-		
-		if (!binaryInfo.installed) {
-			globalStatusText = _('Binary Not Found');
-			globalStatusColor = '#d9534f';
-		} else if (!configData.globalEnabled) {
-			globalStatusText = _('Service Disabled');
-			globalStatusColor = '#d9534f';
-		} else if (status.running) {
-			var instanceCount = (status.instances && status.instances.length) ? status.instances.length : 0;
-			globalStatusText = _('Running') + ' (' + instanceCount + ' ' + _('tunnels') + ')';
-			globalStatusColor = '#5cb85c';
-		} else {
-			globalStatusText = _('Stopped');
-			globalStatusColor = '#d9534f';
-		}
-		
-		// 服务状态表格
-		var statusInfoTable = E('table', { 'class': 'table', 'style': 'width: 100%; margin-bottom: 20px;' }, [
-			E('tr', { 'class': 'tr' }, [
-				E('td', { 'class': 'td', 'style': 'width: 180px; font-weight: bold;' }, 
-					_('Service Status:')),
-				E('td', { 'class': 'td' }, 
-					E('span', { 'style': 'color: ' + globalStatusColor + '; font-weight: bold;' }, 
-						globalStatusText))
-			])
+
+	load: function() {
+		return Promise.all([
+			this.fetchStatusData(),
+			this.getRecentLogs()
 		]);
+	},
+
+	render: function(data) {
+		var self = this;
+		var statusData = data[0];
+		var initialLogs = data[1];
 		
 		var view = E('div', { 'class': 'cbi-map' }, [
 			E('h2', {}, _('UDP Tunnel Status')),
 			
-			// 全局状态
+			// 1. Service Status
 			E('div', { 'class': 'cbi-section' }, [
-				statusInfoTable
+				E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
+					E('div', { 'style': 'width: 200px; font-weight: bold;' }, _('Service Status:')),
+					E('div', { 'id': 'status-indicator', 'style': 'font-weight: bold;' }, _('Loading...'))
+				])
 			]),
-			
-			// 隧道状态表格
+
+			// 2. Tunnel Table
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Tunnel Status')),
-				this.renderStatusTable(status, configData)
+				E('table', { 'class': 'table cbi-section-table', 'id': 'tunnel-table' }, [
+					E('tr', { 'class': 'tr table-titles' }, [
+						E('th', { 'class': 'th' }, _('Name')),
+						E('th', { 'class': 'th' }, _('Mode')),
+						E('th', { 'class': 'th' }, _('Status')),
+						E('th', { 'class': 'th' }, _('Local')),
+						E('th', { 'class': 'th' }, _('Remote')),
+						E('th', { 'class': 'th' }, _('Protocol')),
+						E('th', { 'class': 'th' }, _('PID'))
+					])
+				])
 			]),
-			
-			// 诊断信息
-			this.renderDiagnostics(iptablesInfo, binaryInfo),
-			
-			// 日志
-			this.renderLogs(logs)
+
+			// 3. Diagnostics
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('System Diagnostics')),
+				E('div', { 'style': 'display: grid; grid-template-columns: 200px 1fr; gap: 10px;' }, [
+					E('div', { 'style': 'font-weight: bold;' }, _('Core Binary:')),
+					E('div', { 'id': 'diag-binary' }, _('Checking...')),
+					E('div', { 'style': 'font-weight: bold;' }, _('Iptables Rules:')),
+					// v2.7: 允许换行，防止 Chain 名称过长撑破布局
+					E('div', { 'id': 'diag-iptables', 'style': 'word-break: break-all;' }, _('Checking...'))
+				])
+			]),
+
+			// 4. Logs
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', { 'style': 'display:flex; justify-content:space-between; align-items:center;' }, [
+					_('Recent Logs'),
+					// v2.7: 彻底移除 style 属性，只保留 id，强制跟随主题颜色
+					E('small', { 'id': 'log-status' }, '')
+				]),
+				E('textarea', {
+					'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #1e1e1e; color: #ddd; border: 1px solid #444; padding: 10px; border-radius: 3px;',
+					'readonly': 'readonly',
+					'wrap': 'off',
+					'id': 'syslog-textarea'
+				}),
+				E('div', { 'style': 'margin-top: 5px; text-align: right;' }, [
+					E('button', { 
+						'class': 'cbi-button cbi-button-apply', 
+						'click': function() { self.refreshLogs(view); }
+					}, _('Refresh Logs')),
+					' ',
+					E('button', { 
+						'class': 'cbi-button cbi-button-neutral', 
+						'click': function() {
+							var ta = document.getElementById('syslog-textarea');
+							if (ta) ta.scrollTop = ta.scrollHeight;
+						}
+					}, _('Scroll to Bottom'))
+				])
+			])
 		]);
-		
-		// 设置自动刷新（每10秒）
-		poll.add(L.bind(function() {
-			return this.load().then(L.bind(function(refreshData) {
-				var container = document.querySelector('.cbi-map');
-				if (container) {
-					var newView = this.render(refreshData);
-					container.parentNode.replaceChild(newView, container);
-				}
-			}, this));
-		}, this), 10);
-		
+
+		this.updateStatusView(view, statusData);
+		this.updateLogView(view, initialLogs);
+
+		poll.add(function() {
+			return self.fetchStatusData().then(function(newData) {
+				self.updateStatusView(view, newData);
+			});
+		}, this.pollInterval);
+
 		return view;
 	},
-	
-	handleSaveApply: null,
+
+	refreshLogs: function(view) {
+		var self = this;
+		var logStatus = view.querySelector('#log-status');
+		if (logStatus) logStatus.textContent = _('Refreshing...');
+		
+		this.getRecentLogs().then(function(logs) {
+			self.updateLogView(view, logs);
+		});
+	},
+
+	updateLogView: function(view, logs) {
+		var logTa = view.querySelector('#syslog-textarea');
+		var logStatus = view.querySelector('#log-status');
+		
+		if (logTa) {
+			var newText = logs.length > 0 ? logs.join('\n') : _('No logs found.');
+			logTa.value = newText;
+			logTa.scrollTop = logTa.scrollHeight;
+		}
+
+		if (logStatus) {
+			var d = new Date();
+			logStatus.textContent = _('Last updated: ') + d.toLocaleTimeString();
+		}
+	},
+
+	updateStatusView: function(view, data) {
+		var status = data[0];
+		var tunnels = data[1];
+		var versionInfo = data[2];
+		var iptablesInfo = data[3];
+
+		// 1. Update Service Status
+		var statusEl = view.querySelector('#status-indicator');
+		if (statusEl) {
+			var activeCount = Object.keys(status.instances).length;
+			if (status.running) {
+				statusEl.style.color = '#5cb85c';
+				statusEl.textContent = _('Running') + ' (' + activeCount + ' tunnels active)';
+			} else {
+				statusEl.style.color = '#d9534f';
+				statusEl.textContent = _('Stopped');
+			}
+		}
+
+		// 2. Update Table
+		var table = view.querySelector('#tunnel-table');
+		if (table) {
+			while (table.rows.length > 1) { table.deleteRow(1); }
+
+			if (tunnels.length === 0) {
+				var row = table.insertRow(-1);
+				row.className = 'tr';
+				var cell = row.insertCell(0);
+				cell.className = 'td';
+				cell.colSpan = 7;
+				cell.style.textAlign = 'center';
+				cell.style.padding = '20px';
+				cell.innerHTML = '<em>' + _('No tunnels configured.') + '</em>';
+			} else {
+				tunnels.forEach(function(t) {
+					var instance = status.instances[t.id] || status.instances[t.alias];
+					var isRunning = !!instance;
+					
+					var rowColor = '#d9534f';
+					var statusLabel = _('Stopped');
+					if (t.disabled) {
+						rowColor = '#999';
+						statusLabel = _('Disabled');
+					} else if (isRunning) {
+						rowColor = '#5cb85c';
+						statusLabel = _('Running');
+					}
+
+					var row = table.insertRow(-1);
+					row.className = 'tr';
+					
+					var addCell = function(text, color) {
+						var c = row.insertCell(-1);
+						c.className = 'td';
+						if (color) c.style.color = color;
+						if (color) c.style.fontWeight = 'bold';
+						c.textContent = text;
+						return c;
+					};
+
+					addCell(t.alias);
+					addCell(t.mode === 'server' ? _('Server') : _('Client'));
+					addCell(statusLabel, rowColor);
+					
+					var cLocal = row.insertCell(-1); 
+					cLocal.className = 'td';
+					cLocal.textContent = t.local;
+					
+					var cRemote = row.insertCell(-1); 
+					cRemote.className = 'td';
+					cRemote.textContent = t.remote;
+
+					addCell(t.raw_mode + ' / xor');
+					addCell(instance ? instance.pid : '-');
+				});
+			}
+		}
+
+		// 3. Update Diagnostics
+		var diagBin = view.querySelector('#diag-binary');
+		if (diagBin) {
+			if (versionInfo.installed) {
+				diagBin.innerHTML = '<span style="color:#5cb85c">✓ ' + _('Verified') + ' (' + versionInfo.version + ')</span>';
+			} else {
+				diagBin.innerHTML = '<span style="color:#d9534f">✗ ' + _('Not Found') + '</span>';
+			}
+		}
+		var diagIp = view.querySelector('#diag-iptables');
+		if (diagIp) {
+			diagIp.innerHTML = '<span style="color:' + iptablesInfo.color + '">' + 
+			                   (iptablesInfo.present ? '✓ ' : '⚠ ') + iptablesInfo.text + '</span>';
+		}
+	},
+
 	handleSave: null,
+	handleSaveApply: null,
 	handleReset: null
 });
