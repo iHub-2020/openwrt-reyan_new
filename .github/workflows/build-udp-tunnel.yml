@@ -4,8 +4,8 @@
 #              using OpenWrt SDK for x86_64 and aarch64 architectures.
 #
 # Author: Reyanmatic
-# Date: 2026-01-10
-# Version: 1.7.0 (Fixed error handling, added Release publishing, artifact cleanup)
+# Date: 2026-01-14
+# Version: 1.8.0 (Fixed artifact/release cleanup permissions issue)
 # License: MIT
 # ==============================================================================
 
@@ -20,9 +20,9 @@ on:
         default: 'true'
         type: boolean
 
-# 需要写入权限以创建 Release
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -92,7 +92,6 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          # 移除 IGNORE_ERRORS，编译失败立即中断
           make package/udp2raw/compile V=s
           
           # 验证 ipk 是否生成
@@ -195,70 +194,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete Old Artifacts
-        uses: actions/github-script@v7
+        uses: c-hive/gha-remove-artifacts@v1
         with:
-          script: |
-            const { data: artifacts } = await github.rest.actions.listArtifactsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            
-            // 按名称分组，每组只保留最新 3 个
-            const groups = {};
-            for (const artifact of artifacts.artifacts) {
-              const name = artifact.name.replace(/-x86_64|-aarch64/g, '');
-              if (!groups[name]) groups[name] = [];
-              groups[name].push(artifact);
-            }
-            
-            for (const [name, items] of Object.entries(groups)) {
-              // 按创建时间排序，保留最新 3 个
-              items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-              const toDelete = items.slice(3);
-              
-              for (const artifact of toDelete) {
-                console.log(`Deleting artifact: ${artifact.name} (${artifact.id})`);
-                await github.rest.actions.deleteArtifact({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  artifact_id: artifact.id
-                });
-              }
-            }
+          age: '1 day'
+          skip-tags: false
+          skip-recent: 6
 
       - name: Delete Old Releases
-        uses: actions/github-script@v7
+        uses: dev-drprasad/delete-older-releases@v0.3.4
         with:
-          script: |
-            const { data: releases } = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            
-            // 按创建时间排序，保留最新 3 个
-            releases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            const toDelete = releases.slice(3);
-            
-            for (const release of toDelete) {
-              console.log(`Deleting release: ${release.tag_name} (${release.id})`);
-              
-              // 删除关联的 tag
-              try {
-                await github.rest.git.deleteRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `tags/${release.tag_name}`
-                });
-              } catch (e) {
-                console.log(`Tag ${release.tag_name} already deleted or not found`);
-              }
-              
-              // 删除 release
-              await github.rest.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.id
-              });
-            }
+          keep_latest: 3
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
