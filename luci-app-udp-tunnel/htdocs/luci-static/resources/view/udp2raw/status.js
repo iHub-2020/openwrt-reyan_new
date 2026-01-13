@@ -253,7 +253,7 @@ return view.extend({
 				E('h3', { 'style': 'display:flex; justify-content:space-between; align-items:center;' }, [
 					_('Recent Logs'),
 					// v2.7: 彻底移除 style 属性，只保留 id，强制跟随主题颜色
-					E('small', { 'id': 'log-status' }, '')
+					E('span', { 'id': 'log-status', 'style': 'font-size: 0.85em;' }, '')
 				]),
 				E('textarea', {
 					'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #1e1e1e; color: #ddd; border: 1px solid #444; padding: 10px; border-radius: 3px;',
@@ -309,10 +309,11 @@ return view.extend({
 			logTa.value = newText;
 			logTa.scrollTop = logTa.scrollHeight;
 		}
-
+	
 		if (logStatus) {
 			var d = new Date();
 			logStatus.textContent = _('Last updated: ') + d.toLocaleTimeString();
+			logStatus.style.color = 'inherit';
 		}
 	},
 
