@@ -98,10 +98,10 @@ return view.extend({
 		// ==================== Info & Warning Area ====================
 		m.description = E('div', {}, [
 			// Status Bar
-			E('div', { 'class': 'cbi-section', 'style': 'margin-bottom: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;' }, [
+			E('div', { 'class': 'cbi-section', 'style': 'margin-bottom: 10px; padding: 10px; background: #2d3a4a; border-radius: 5px;' }, [
 				E('table', { 'style': 'width: auto;' }, [
 					E('tr', {}, [
-						E('td', { 'style': 'font-weight: bold; padding-right: 10px; color: #333333;' }, _('Service Status:')),
+						E('td', { 'style': 'font-weight: bold; padding-right: 10px;' }, _('Service Status:')),
 						E('td', {}, E('span', { 'style': 'color: ' + statusColor + '; font-weight: bold;' }, statusText))
 					])
 				])
