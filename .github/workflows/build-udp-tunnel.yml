@@ -87,18 +87,41 @@ jobs:
           if [ -d "$PO_DIR/zh_Hans" ]; then
             echo "✓ Found zh_Hans directory"
             ls -la "$PO_DIR/zh_Hans/"
+          else
+            echo "✗ zh_Hans directory not found!"
+            exit 1
           fi
           
+          # 检查或创建 zh-cn 符号链接（使用子 shell 避免改变当前目录）
           if [ -L "$PO_DIR/zh-cn" ]; then
-            echo "✓ Found zh-cn symlink -> $(readlink $PO_DIR/zh-cn)"
+            echo "✓ Found zh-cn symlink -> $(readlink "$PO_DIR/zh-cn")"
+          elif [ -e "$PO_DIR/zh-cn" ]; then
+            echo "⚠ zh-cn exists but is not a symlink, removing..."
+            rm -rf "$PO_DIR/zh-cn"
+            ln -sf zh_Hans "$PO_DIR/zh-cn"
+            echo "✓ Created zh-cn symlink"
           else
             echo "⚠ Creating zh-cn symlink..."
-            cd "$PO_DIR" && ln -sf zh_Hans zh-cn
+            ln -sf zh_Hans "$PO_DIR/zh-cn"
+            echo "✓ Created zh-cn symlink"
+          fi
+          
+          # 验证符号链接
+          if [ -L "$PO_DIR/zh-cn" ]; then
+            echo "✓ Symlink verified: zh-cn -> $(readlink "$PO_DIR/zh-cn")"
+          else
+            echo "✗ Failed to create symlink!"
+            ls -la "$PO_DIR/"
+            exit 1
           fi
           
           echo ""
           echo "=== PO directory structure ==="
-          find luci-app-udp-tunnel/po -type f -o -type l | head -20
+          find "$PO_DIR" -type f -o -type l 2>/dev/null | head -20
+          
+          echo ""
+          echo "=== Full listing ==="
+          ls -la "$PO_DIR/"
 
       - name: Prepare Package Sources
         run: |
