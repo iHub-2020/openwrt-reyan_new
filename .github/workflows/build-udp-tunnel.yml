@@ -5,14 +5,13 @@
 #
 # Author: Reyanmatic
 # Date: 2026-01-14
-# Version: 2.0.0 (Complete rewrite of translation compilation logic)
+# Version: 2.1.0
 # License: MIT
 #
 # Changelog:
+#   v2.1.0 - Fixed po2lmo compilation: must include lib/lmo.c for sfh_hash
+#          - po2lmo.c depends on lib/lmo.h and lib/lmo.c
 #   v2.0.0 - Fixed translation by pre-compiling LMO in workflow before SDK build
-#          - Compile po2lmo from luci-base source with multiple fallback methods
-#          - Copy pre-compiled .lmo into package directory for Makefile to install
-#          - This bypasses all Makefile shell variable escaping issues
 #   v1.9.0 - Added po2lmo tool compilation step (had issues)
 #   v1.8.0 - Fixed artifact/release cleanup permissions issue
 # ==============================================================================
@@ -67,7 +66,6 @@ jobs:
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          # 使用 GitHub 镜像替代不稳定的 git.openwrt.org
           cat > feeds.conf << 'EOF'
           src-git-full base https://github.com/openwrt/openwrt.git;openwrt-23.05
           src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
@@ -75,7 +73,6 @@ jobs:
           src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
           EOF
           
-          # 更新 feeds，带重试
           for i in 1 2 3; do
             ./scripts/feeds update -a && break
             echo "Retry $i..."
@@ -83,13 +80,11 @@ jobs:
           done
           
           [ -d "feeds/base" ] || { echo "feeds/base missing"; exit 1; }
-          
-          # 安装依赖
           ./scripts/feeds install luci-base luci-compat iptables
 
       # ============================================================
-      # 关键步骤：在 SDK 外部编译 po2lmo 并预编译翻译文件
-      # 这完全绕过了 Makefile 中的 shell 变量转义问题
+      # 关键步骤：编译 po2lmo 并预编译翻译文件
+      # 修复：po2lmo.c 依赖 lib/lmo.c 中的 sfh_hash 函数
       # ============================================================
       - name: Compile po2lmo and Pre-compile Translations
         run: |
@@ -97,52 +92,50 @@ jobs:
           echo "Step 1: Compile po2lmo tool"
           echo "=========================================="
           
-          # 进入 luci-base 源码目录
-          cd sdk/feeds/luci/modules/luci-base/src
+          LUCI_BASE_SRC="sdk/feeds/luci/modules/luci-base/src"
+          cd "$LUCI_BASE_SRC"
           
-          # 显示可用的源文件
-          echo "Available source files:"
-          ls -la *.c 2>/dev/null || echo "No .c files found"
+          echo "=== Directory structure ==="
+          find . -name "*.c" -o -name "*.h" | head -20
           
-          # 编译 po2lmo（它是一个独立的小工具，不需要 Lua）
-          if [ -f "po2lmo.c" ]; then
-            echo "Compiling po2lmo..."
-            
-            # 方法1：简单编译（po2lmo 实际上不依赖 Lua 库）
-            gcc -o po2lmo po2lmo.c -O2 2>&1 && {
-              echo "✓ po2lmo compiled successfully (method 1)"
-            } || {
-              # 方法2：如果有 template_lmo.c，一起编译
-              echo "Method 1 failed, trying method 2..."
-              gcc -o po2lmo po2lmo.c template_lmo.c -O2 2>&1 || {
-                # 方法3：只编译 po2lmo.c，可能需要不同的标志
-                echo "Method 2 failed, trying method 3..."
-                gcc -o po2lmo po2lmo.c -O2 -w 2>&1 || {
-                  echo "All compilation methods failed!"
-                  echo "=== po2lmo.c content (first 50 lines) ==="
-                  head -50 po2lmo.c
-                  exit 1
-                }
-              }
-            }
-            
-            # 验证编译结果
-            if [ -x ./po2lmo ]; then
-              echo "✓ po2lmo binary created"
-              ls -la ./po2lmo
-              ./po2lmo 2>&1 | head -5 || true
+          echo ""
+          echo "=== Checking required files ==="
+          
+          # 检查必需的文件
+          for f in po2lmo.c lib/lmo.c lib/lmo.h; do
+            if [ -f "$f" ]; then
+              echo "✓ Found: $f"
             else
-              echo "✗ po2lmo binary not found or not executable"
+              echo "✗ Missing: $f"
+            fi
+          done
+          
+          echo ""
+          echo "=== Compiling po2lmo ==="
+          
+          # 正确的编译方式：包含 lib/lmo.c
+          if [ -f "po2lmo.c" ] && [ -f "lib/lmo.c" ]; then
+            # -I. 让编译器能找到 lib/lmo.h
+            gcc -o po2lmo po2lmo.c lib/lmo.c -I. -O2 2>&1
+            
+            if [ -x ./po2lmo ]; then
+              echo "✓ po2lmo compiled successfully!"
+              ls -la ./po2lmo
+              echo ""
+              echo "=== Testing po2lmo ==="
+              ./po2lmo 2>&1 || true
+            else
+              echo "✗ Compilation failed!"
               exit 1
             fi
           else
-            echo "✗ po2lmo.c not found!"
-            echo "Directory contents:"
-            ls -la
+            echo "✗ Required source files not found!"
+            echo ""
+            echo "=== Full directory listing ==="
+            find . -type f
             exit 1
           fi
           
-          # 保存 po2lmo 路径
           PO2LMO_PATH="$(pwd)/po2lmo"
           
           echo ""
@@ -150,62 +143,51 @@ jobs:
           echo "Step 2: Pre-compile translation files"
           echo "=========================================="
           
-          # 回到仓库根目录
-          cd $GITHUB_WORKSPACE
+          cd "$GITHUB_WORKSPACE"
           
-          # 检查 PO 文件
           PO_FILE="luci-app-udp-tunnel/po/zh_Hans/udp-tunnel.po"
+          
           if [ -f "$PO_FILE" ]; then
             echo "Found PO file: $PO_FILE"
-            echo "PO file size: $(wc -c < "$PO_FILE") bytes"
-            echo "PO file lines: $(wc -l < "$PO_FILE") lines"
+            echo "Size: $(wc -c < "$PO_FILE") bytes, $(wc -l < "$PO_FILE") lines"
             
-            # 创建 i18n 目录
             mkdir -p luci-app-udp-tunnel/i18n
             
-            # 编译 PO 到 LMO
+            echo ""
             echo "Compiling PO -> LMO..."
             "$PO2LMO_PATH" "$PO_FILE" "luci-app-udp-tunnel/i18n/udp-tunnel.zh-cn.lmo"
             
-            # 验证 LMO 文件
             if [ -f "luci-app-udp-tunnel/i18n/udp-tunnel.zh-cn.lmo" ]; then
               LMO_SIZE=$(wc -c < "luci-app-udp-tunnel/i18n/udp-tunnel.zh-cn.lmo")
               echo "✓ LMO file created: $LMO_SIZE bytes"
+              ls -la luci-app-udp-tunnel/i18n/
+              file luci-app-udp-tunnel/i18n/udp-tunnel.zh-cn.lmo || true
               
               if [ "$LMO_SIZE" -lt 100 ]; then
                 echo "⚠ WARNING: LMO file seems too small!"
-              else
-                echo "✓ LMO file size looks good"
               fi
-              
-              # 显示文件信息
-              ls -la luci-app-udp-tunnel/i18n/
-              file luci-app-udp-tunnel/i18n/udp-tunnel.zh-cn.lmo || true
             else
               echo "✗ LMO file was not created!"
               exit 1
             fi
           else
             echo "✗ PO file not found: $PO_FILE"
-            echo "Available files in luci-app-udp-tunnel/po/:"
-            find luci-app-udp-tunnel/po/ -type f 2>/dev/null || echo "Directory not found"
+            find luci-app-udp-tunnel -name "*.po" 2>/dev/null
             exit 1
           fi
           
           echo ""
           echo "=========================================="
-          echo "Translation pre-compilation complete!"
+          echo "✓ Translation pre-compilation complete!"
           echo "=========================================="
 
       - name: Prepare Package Sources
         run: |
-          # 复制包到 SDK（包含预编译的 i18n/*.lmo）
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # 验证 LMO 文件已复制
           echo "Verifying LMO file in SDK package directory:"
-          ls -la sdk/package/luci-app-udp-tunnel/i18n/ || echo "i18n directory not found"
+          ls -la sdk/package/luci-app-udp-tunnel/i18n/
 
       - name: Configure Build
         working-directory: sdk
@@ -217,7 +199,6 @@ jobs:
         run: |
           make package/udp2raw/compile V=s
           
-          # 验证 ipk 是否生成
           if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
             echo "ERROR: udp2raw ipk not found!"
             exit 1
@@ -226,38 +207,29 @@ jobs:
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
         run: |
-          # 再次确认 LMO 文件存在
           echo "=== Checking pre-compiled LMO ==="
-          ls -la package/luci-app-udp-tunnel/i18n/ || echo "No i18n directory"
+          ls -la package/luci-app-udp-tunnel/i18n/
           
-          # 编译
           make package/luci-app-udp-tunnel/compile V=s
           
-          # 验证主包
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
             echo "ERROR: luci-app-udp-tunnel ipk not found!"
             exit 1
           fi
           
-          # 验证语言包内容
           echo ""
           echo "=== Verifying language pack contents ==="
           I18N_IPK=$(find bin/packages -name "luci-i18n-udp-tunnel-zh-cn*.ipk" | head -1)
           if [ -n "$I18N_IPK" ]; then
             echo "Found: $I18N_IPK"
-            IPK_SIZE=$(stat -c%s "$I18N_IPK")
-            echo "Size: $IPK_SIZE bytes"
+            echo "Size: $(stat -c%s "$I18N_IPK") bytes"
             
-            # 解压检查
             mkdir -p /tmp/ipk-check
             cd /tmp/ipk-check
             
-            # IPK 是 ar 归档或 tar.gz
             ar x "$GITHUB_WORKSPACE/sdk/$I18N_IPK" 2>/dev/null || \
-            tar xzf "$GITHUB_WORKSPACE/sdk/$I18N_IPK" 2>/dev/null || \
-            echo "Could not extract IPK"
+            tar xzf "$GITHUB_WORKSPACE/sdk/$I18N_IPK" 2>/dev/null || true
             
-            # 解压 data.tar.*
             if [ -f data.tar.gz ]; then
               tar xzf data.tar.gz
             elif [ -f data.tar.zst ]; then
@@ -275,35 +247,26 @@ jobs:
               echo "✓✓✓ SUCCESS: Found $LMO_COUNT valid LMO file(s)! ✓✓✓"
             else
               echo ""
-              echo "✗✗✗ FAILURE: No valid LMO files found! ✗✗✗"
-              echo "IPK structure:"
+              echo "✗✗✗ WARNING: No valid LMO files in IPK ✗✗✗"
               find . -type f
-              # 不退出，让用户看到具体问题
             fi
             
             cd "$GITHUB_WORKSPACE/sdk"
-          else
-            echo "WARNING: luci-i18n-udp-tunnel-zh-cn ipk not found"
           fi
 
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
           
-          # 只收集目标包，不包含 feeds 依赖
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           
           echo "=== Collected artifacts ==="
-          ls -la artifacts/
-          
-          # 显示每个 IPK 的大小
           for f in artifacts/*.ipk; do
             echo "  $(basename $f): $(stat -c%s $f) bytes"
           done
           
-          # 确保有文件
           if [ -z "$(ls -A artifacts/)" ]; then
             echo "ERROR: No artifacts collected!"
             exit 1
@@ -316,7 +279,6 @@ jobs:
           path: artifacts/*.ipk
           retention-days: 7
 
-  # 发布 Release
   release:
     name: Create Release
     needs: build
@@ -332,7 +294,6 @@ jobs:
         run: |
           mkdir -p final-release
           find release-files -name "*.ipk" -exec cp {} final-release/ \;
-          
           echo "=== Release files ==="
           ls -la final-release/
 
@@ -341,7 +302,6 @@ jobs:
         run: |
           TAG="v$(date +'%Y%m%d-%H%M%S')"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Generated tag: $TAG"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -352,14 +312,13 @@ jobs:
             ## UDP-Tunnel 自动构建
             
             构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
-            提交: ${{ github.sha }}
             
             ### 包含文件
             - udp2raw (x86_64, aarch64)
             - luci-app-udp-tunnel (x86_64, aarch64)
             - luci-i18n-udp-tunnel-zh-cn (简体中文翻译)
             
-            ### 安装方法
+            ### 安装
             ```bash
             opkg install udp2raw*.ipk luci-app-udp-tunnel*.ipk luci-i18n-udp-tunnel*.ipk
             ```
@@ -367,7 +326,6 @@ jobs:
           draft: false
           prerelease: false
 
-  # 清理旧的 Artifacts 和 Releases
   cleanup:
     name: Cleanup Old Artifacts and Releases
     needs: release
