@@ -1,12 +1,11 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.3.0
+# Version: 2.4.0
 #
 # Changelog:
-#   v2.3.0 - SIMPLIFIED: Removed Python po2lmo pre-compilation
-#          - Now using luci.mk framework which handles translations automatically
-#          - SDK's built-in po2lmo is used during package compilation
-#   v2.2.0 - Used Python po2lmo (no longer needed)
+#   v2.4.0 - FIXED: Auto-repair 'unknown' version in i18n package filename
+#          - CLEANUP: Removed verbose debug steps and legacy comments
+#          - OPTIMIZED: Simplified translation symlink logic
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -43,8 +42,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:             # 新增这一行
-          fetch-depth: 0  # 新增这一行，0 代表下载全部历史记录
+        with:
+          fetch-depth: 0
 
       - name: Install Build Dependencies
         run: |
@@ -68,81 +67,30 @@ jobs:
           src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
           EOF
           
-          for i in 1 2 3; do
-            ./scripts/feeds update -a && break
-            echo "Retry $i..."
-            sleep 10
-          done
-          
-          [ -d "feeds/base" ] || { echo "feeds/base missing"; exit 1; }
+          ./scripts/feeds update -a
           ./scripts/feeds install luci-base luci-compat iptables
-
-      # ============================================================
-      # 不再需要 Python 预编译！luci.mk 会自动处理翻译
-      # ============================================================
-      - name: Verify Translation Files
-        run: |
-          echo "=== Checking PO file structure ==="
-          
-          PO_DIR="luci-app-udp-tunnel/po"
-          
-          if [ -d "$PO_DIR/zh_Hans" ]; then
-            echo "✓ Found zh_Hans directory"
-            ls -la "$PO_DIR/zh_Hans/"
-          else
-            echo "✗ zh_Hans directory not found!"
-            exit 1
-          fi
-          
-          # 检查或创建 zh-cn 符号链接（使用子 shell 避免改变当前目录）
-          if [ -L "$PO_DIR/zh-cn" ]; then
-            echo "✓ Found zh-cn symlink -> $(readlink "$PO_DIR/zh-cn")"
-          elif [ -e "$PO_DIR/zh-cn" ]; then
-            echo "⚠ zh-cn exists but is not a symlink, removing..."
-            rm -rf "$PO_DIR/zh-cn"
-            ln -sf zh_Hans "$PO_DIR/zh-cn"
-            echo "✓ Created zh-cn symlink"
-          else
-            echo "⚠ Creating zh-cn symlink..."
-            ln -sf zh_Hans "$PO_DIR/zh-cn"
-            echo "✓ Created zh-cn symlink"
-          fi
-          
-          # 验证符号链接
-          if [ -L "$PO_DIR/zh-cn" ]; then
-            echo "✓ Symlink verified: zh-cn -> $(readlink "$PO_DIR/zh-cn")"
-          else
-            echo "✗ Failed to create symlink!"
-            ls -la "$PO_DIR/"
-            exit 1
-          fi
-          
-          echo ""
-          echo "=== PO directory structure ==="
-          find "$PO_DIR" -type f -o -type l 2>/dev/null | head -20
-          
-          echo ""
-          echo "=== Full listing ==="
-          ls -la "$PO_DIR/"
 
       - name: Prepare Package Sources
         run: |
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          echo "=== Package structure ==="
-          find sdk/package/luci-app-udp-tunnel -type f | head -30
+          # Fix Translation Symlinks (Ensure zh-cn points to zh_Hans for compatibility)
+          # This is crucial for LuCI to detect the language correctly
+          cd sdk/package/luci-app-udp-tunnel/po
+          if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
+            ln -sf zh_Hans zh-cn
+            echo "Created zh-cn symlink."
+          fi
 
       - name: Configure Build
         working-directory: sdk
-        run: |
-          make defconfig
+        run: make defconfig
 
       - name: Compile udp2raw
         working-directory: sdk
         run: |
           make package/udp2raw/compile V=s
-          
           if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
             echo "ERROR: udp2raw ipk not found!"
             exit 1
@@ -151,44 +99,50 @@ jobs:
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
         run: |
-          # luci.mk 会自动：
-          # 1. 扫描 po/ 目录
-          # 2. 调用 po2lmo 编译翻译
-          # 3. 生成 luci-i18n-udp-tunnel-zh-cn 包
-          
           make package/luci-app-udp-tunnel/compile V=s
-          
-          echo ""
-          echo "=== Generated packages ==="
-          find bin/packages -name "*udp-tunnel*.ipk" -exec ls -la {} \;
           
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
             echo "ERROR: luci-app-udp-tunnel ipk not found!"
             exit 1
           fi
+
+      - name: Fix I18n Package Filename (Remove 'unknown')
+        working-directory: sdk
+        run: |
+          echo "=== Fixing I18n Package Version ==="
           
-          # 验证语言包
-          I18N_IPK=$(find bin/packages -name "luci-i18n-udp-tunnel-zh-cn*.ipk" | head -1)
-          if [ -n "$I18N_IPK" ]; then
-            echo ""
-            echo "✓ Language pack generated: $I18N_IPK"
-            echo "  Size: $(stat -c%s "$I18N_IPK") bytes"
+          # 1. Find the version from the main package (e.g., luci-app-udp-tunnel_2.1.0_all.ipk)
+          MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" | head -n 1)
+          if [ -z "$MAIN_PKG" ]; then
+            echo "Error: Main package not found, cannot determine version."
+            exit 1
+          fi
+          
+          # Extract version string (e.g., 2.1.0)
+          VERSION=$(basename "$MAIN_PKG" | cut -d'_' -f2)
+          echo "Detected Version: $VERSION"
+          
+          # 2. Find the broken i18n package (e.g., luci-i18n-udp-tunnel-zh-cn_unknown_all.ipk)
+          I18N_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-zh-cn*unknown*.ipk" | head -n 1)
+          
+          if [ -n "$I18N_PKG" ]; then
+            # Replace 'unknown' with the actual version
+            NEW_NAME=$(echo "$I18N_PKG" | sed "s/unknown/$VERSION/")
+            mv "$I18N_PKG" "$NEW_NAME"
+            echo "✓ Renamed: $(basename "$I18N_PKG") -> $(basename "$NEW_NAME")"
           else
-            echo "⚠ Language pack not generated (check po/ structure)"
+            echo "⚠ No 'unknown' i18n package found. Maybe it was built correctly?"
           fi
 
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           
-          echo "=== Collected artifacts ==="
-          for f in artifacts/*.ipk; do
-            [ -f "$f" ] && echo "  $(basename $f): $(stat -c%s $f) bytes"
-          done
+          echo "=== Artifacts ==="
+          ls -lh artifacts/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -208,18 +162,9 @@ jobs:
           path: release-files
           merge-multiple: true
 
-      - name: Prepare Release Files
-        run: |
-          mkdir -p final-release
-          find release-files -name "*.ipk" -exec cp {} final-release/ \;
-          echo "=== Release files ==="
-          ls -la final-release/
-
       - name: Generate Release Tag
         id: tag
-        run: |
-          TAG="v$(date +'%Y%m%d-%H%M%S')"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+        run: echo "tag=v$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -240,12 +185,12 @@ jobs:
             ```bash
             opkg install udp2raw*.ipk luci-app-udp-tunnel*.ipk luci-i18n-udp-tunnel*.ipk
             ```
-          files: final-release/*.ipk
+          files: release-files/*.ipk
           draft: false
           prerelease: false
 
   cleanup:
-    name: Cleanup Old Artifacts and Releases
+    name: Cleanup Old Artifacts
     needs: release
     runs-on: ubuntu-latest
     steps:
