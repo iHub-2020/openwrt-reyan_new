@@ -4,11 +4,13 @@
 #
 # Project: LuCI Support for UDP Tunnel Manager
 # Description: Web interface for udp2raw tunnel configuration
-# Version: 1.5.0
+# Version: 1.5.1
 # Last Updated: 2026-01-14
 # Depends: udp2raw (>= 20230206.0)
 #
 # Changelog:
+#   v1.5.1 - Fixed Build/Compile shell syntax for CI environment
+#          - Simplified po2lmo command execution
 #   v1.5.0 - Fixed translation compilation path issues
 #          - Fixed po2lmo source path reference
 #   v1.4.0 - Sync version with JS files
@@ -20,7 +22,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-udp-tunnel
-PKG_VERSION:=1.5.0
+PKG_VERSION:=1.5.1
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=iHub-2020
@@ -67,30 +69,13 @@ define Build/Prepare
 endef
 
 # ============================================================
-# 编译翻译文件
+# 编译翻译文件 - 简化版本
 # ============================================================
 define Build/Compile
-	# 创建 i18n 输出目录
 	mkdir -p $(PKG_BUILD_DIR)/i18n
-	
-	# 查找 po2lmo 工具
-	PO2LMO=$$(find $(STAGING_DIR_HOST) -name 'po2lmo' -type f 2>/dev/null | head -1); \
-	if [ -z "$$PO2LMO" ]; then \
-		PO2LMO="$(STAGING_DIR_HOST)/bin/po2lmo"; \
-	fi; \
-	echo "Using po2lmo: $$PO2LMO"; \
-	\
-	# 编译 zh_Hans 目录
-	if [ -f $(PKG_BUILD_DIR)/po/zh_Hans/$(PO_NAME).po ]; then \
-		echo "Compiling zh_Hans translation..."; \
-		$$PO2LMO $(PKG_BUILD_DIR)/po/zh_Hans/$(PO_NAME).po \
-			$(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo; \
-		echo "Created: $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo"; \
-		ls -la $(PKG_BUILD_DIR)/i18n/; \
-	else \
-		echo "[WARN] PO file not found: $(PKG_BUILD_DIR)/po/zh_Hans/$(PO_NAME).po"; \
-		ls -la $(PKG_BUILD_DIR)/po/ 2>/dev/null || echo "po directory not found"; \
-	fi
+	$(STAGING_DIR_HOST)/bin/po2lmo \
+		$(PKG_BUILD_DIR)/po/zh_Hans/$(PO_NAME).po \
+		$(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo
 endef
 
 # ============================================================
@@ -99,31 +84,23 @@ endef
 define Package/luci-app-udp-tunnel/install
 	# ACL 权限配置
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
-	if [ -d $(PKG_BUILD_DIR)/root/usr/share/rpcd/acl.d ]; then \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/root/usr/share/rpcd/acl.d/*.json \
-			$(1)/usr/share/rpcd/acl.d/ 2>/dev/null || true; \
-	fi
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/root/usr/share/rpcd/acl.d/*.json \
+		$(1)/usr/share/rpcd/acl.d/
 	
 	# LuCI 控制器 (JS)
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/udp2raw
-	if [ -d $(PKG_BUILD_DIR)/htdocs/luci-static/resources/view/udp2raw ]; then \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/htdocs/luci-static/resources/view/udp2raw/*.js \
-			$(1)/www/luci-static/resources/view/udp2raw/ 2>/dev/null || true; \
-	fi
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/htdocs/luci-static/resources/view/udp2raw/*.js \
+		$(1)/www/luci-static/resources/view/udp2raw/
 	
 	# LuCI 菜单配置
 	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
-	if [ -d $(PKG_BUILD_DIR)/root/usr/share/luci/menu.d ]; then \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/root/usr/share/luci/menu.d/*.json \
-			$(1)/usr/share/luci/menu.d/ 2>/dev/null || true; \
-	fi
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/root/usr/share/luci/menu.d/*.json \
+		$(1)/usr/share/luci/menu.d/
 	
 	# uci-defaults 首次安装脚本
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	if [ -f $(PKG_BUILD_DIR)/root/etc/uci-defaults/40_luci-udp-tunnel ]; then \
-		$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/40_luci-udp-tunnel \
-			$(1)/etc/uci-defaults/40_luci-udp-tunnel; \
-	fi
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/40_luci-udp-tunnel \
+		$(1)/etc/uci-defaults/
 endef
 
 define Package/luci-app-udp-tunnel/postinst
@@ -154,21 +131,12 @@ define Package/luci-i18n-udp-tunnel-zh-cn/description
 endef
 
 define Package/luci-i18n-udp-tunnel-zh-cn/install
-	# 安装到两个路径确保兼容性
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
 	$(INSTALL_DIR) $(1)/usr/share/luci/i18n
-	
-	# 从编译目录安装 LMO 文件
-	if [ -f $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo ]; then \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo \
-			$(1)/usr/lib/lua/luci/i18n/$(PO_NAME).zh-cn.lmo; \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo \
-			$(1)/usr/share/luci/i18n/$(PO_NAME).zh-cn.lmo; \
-		echo "Installed LMO to both paths"; \
-	else \
-		echo "[ERROR] LMO file not found: $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo"; \
-		exit 1; \
-	fi
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo \
+		$(1)/usr/lib/lua/luci/i18n/$(PO_NAME).zh-cn.lmo
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/i18n/$(PO_NAME).zh-cn.lmo \
+		$(1)/usr/share/luci/i18n/$(PO_NAME).zh-cn.lmo
 endef
 
 $(eval $(call BuildPackage,luci-i18n-udp-tunnel-zh-cn))
