@@ -5,8 +5,13 @@
 #
 # Author: Reyanmatic
 # Date: 2026-01-14
-# Version: 1.8.0 (Fixed artifact/release cleanup permissions issue)
+# Version: 1.9.0 (Fixed po2lmo compilation for i18n language packs)
 # License: MIT
+#
+# Changelog:
+#   v1.9.0 - Added po2lmo tool compilation step to fix empty language packs
+#          - po2lmo is required to convert .po files to .lmo format
+#   v1.8.0 - Fixed artifact/release cleanup permissions issue
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -47,7 +52,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
+          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd lua5.1 liblua5.1-0-dev
           git config --global --add safe.directory '*'
 
       - name: Download and Extract OpenWrt SDK
@@ -89,6 +94,76 @@ jobs:
         run: |
           make defconfig
 
+      # ============================================================
+      # 关键修复：编译 po2lmo 工具
+      # po2lmo 用于将 .po 翻译文件转换为 LuCI 使用的 .lmo 格式
+      # 如果没有这个工具，语言包 ipk 将是空的！
+      # ============================================================
+      - name: Compile po2lmo Tool
+        working-directory: sdk
+        run: |
+          echo "=== Compiling po2lmo translation tool ==="
+          
+          # 方法1：尝试使用 OpenWrt 构建系统编译
+          if make package/luci-base/host/compile V=s 2>/dev/null; then
+            echo "po2lmo compiled via OpenWrt build system"
+          else
+            echo "Fallback: Compiling po2lmo manually..."
+            
+            # 方法2：手动编译 po2lmo
+            cd feeds/luci/modules/luci-base/src
+            
+            # 检查源文件是否存在
+            if [ -f po2lmo.c ]; then
+              # 编译 po2lmo（需要链接 Lua 库）
+              gcc -o po2lmo po2lmo.c template_lmo.c \
+                -I/usr/include/lua5.1 \
+                -llua5.1 \
+                -DLUA_USE_LINUX \
+                2>/dev/null || \
+              # 备用编译命令（不同系统可能路径不同）
+              gcc -o po2lmo po2lmo.c template_lmo.c \
+                $(pkg-config --cflags --libs lua5.1 2>/dev/null || echo "-llua") \
+                2>/dev/null || \
+              # 最简编译（某些系统）
+              gcc -o po2lmo po2lmo.c template_lmo.c -llua 2>/dev/null || \
+              echo "[WARN] Manual po2lmo compilation failed"
+              
+              # 复制到 SDK 的 host bin 目录
+              if [ -f po2lmo ]; then
+                mkdir -p $GITHUB_WORKSPACE/sdk/staging_dir/host/bin
+                cp po2lmo $GITHUB_WORKSPACE/sdk/staging_dir/host/bin/
+                chmod +x $GITHUB_WORKSPACE/sdk/staging_dir/host/bin/po2lmo
+                echo "po2lmo installed to staging_dir/host/bin/"
+              fi
+            else
+              echo "[ERROR] po2lmo.c not found in luci-base/src"
+              ls -la
+            fi
+          fi
+          
+          # 验证 po2lmo 是否可用
+          echo "=== Verifying po2lmo installation ==="
+          PO2LMO_PATH=""
+          for p in \
+            "$GITHUB_WORKSPACE/sdk/staging_dir/host/bin/po2lmo" \
+            "$GITHUB_WORKSPACE/sdk/staging_dir/hostpkg/bin/po2lmo" \
+            "$(which po2lmo 2>/dev/null)"; do
+            if [ -x "$p" ]; then
+              PO2LMO_PATH="$p"
+              echo "✓ po2lmo found at: $p"
+              $p 2>&1 | head -3 || true
+              break
+            fi
+          done
+          
+          if [ -z "$PO2LMO_PATH" ]; then
+            echo "⚠ WARNING: po2lmo not found! Language packs may be empty."
+            echo "Searched locations:"
+            ls -la $GITHUB_WORKSPACE/sdk/staging_dir/host/bin/ 2>/dev/null || echo "  host/bin not found"
+            ls -la $GITHUB_WORKSPACE/sdk/staging_dir/hostpkg/bin/ 2>/dev/null || echo "  hostpkg/bin not found"
+          fi
+
       - name: Compile udp2raw
         working-directory: sdk
         run: |
@@ -103,12 +178,46 @@ jobs:
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
         run: |
+          # 显示 po2lmo 路径供调试
+          echo "=== po2lmo availability check ==="
+          ls -la staging_dir/host/bin/po2lmo 2>/dev/null || echo "Not in staging_dir/host/bin"
+          ls -la staging_dir/hostpkg/bin/po2lmo 2>/dev/null || echo "Not in staging_dir/hostpkg/bin"
+          which po2lmo 2>/dev/null || echo "Not in PATH"
+          
+          # 编译主包
           make package/luci-app-udp-tunnel/compile V=s
           
           # 验证 ipk 是否生成
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
             echo "ERROR: luci-app-udp-tunnel ipk not found!"
             exit 1
+          fi
+          
+          # 验证语言包是否生成且非空
+          echo "=== Verifying language pack ==="
+          I18N_IPK=$(find bin/packages -name "luci-i18n-udp-tunnel*.ipk" | head -1)
+          if [ -n "$I18N_IPK" ]; then
+            echo "Found: $I18N_IPK"
+            echo "Size: $(ls -la "$I18N_IPK" | awk '{print $5}') bytes"
+            
+            # 解压检查内容
+            mkdir -p /tmp/i18n-check
+            cd /tmp/i18n-check
+            tar xzf "$I18N_IPK" 2>/dev/null || ar x "$I18N_IPK" 2>/dev/null
+            tar xzf data.tar.gz 2>/dev/null || tar xzf data.tar.zst 2>/dev/null || true
+            
+            echo "=== Language pack contents ==="
+            find . -name "*.lmo" -exec ls -la {} \;
+            
+            if find . -name "*.lmo" -size +0 | grep -q .; then
+              echo "✓ LMO files found and not empty!"
+            else
+              echo "⚠ WARNING: LMO files missing or empty!"
+            fi
+            
+            cd $GITHUB_WORKSPACE/sdk
+          else
+            echo "⚠ WARNING: luci-i18n-udp-tunnel ipk not found!"
           fi
 
       - name: Organize Artifacts
@@ -177,7 +286,7 @@ jobs:
             ### 包含文件
             - udp2raw (x86_64, aarch64)
             - luci-app-udp-tunnel (x86_64, aarch64)
-            - luci-i18n-udp-tunnel-zh-cn
+            - luci-i18n-udp-tunnel-zh-cn (简体中文翻译)
             
             ### 安装方法
             ```bash
