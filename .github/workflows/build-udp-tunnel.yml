@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:             # 新增这一行
+          fetch-depth: 0  # 新增这一行，0 代表下载全部历史记录
 
       - name: Install Build Dependencies
         run: |
