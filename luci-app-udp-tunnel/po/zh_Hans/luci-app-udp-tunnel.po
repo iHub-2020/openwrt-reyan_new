@@ -5,7 +5,7 @@ msgstr ""
 "Language: zh_Hans\n"
 
 msgid "UDP Tunnel Manager"
-msgstr "UDP 隧道管理"
+msgstr "UDP 隧道管理器"
 
 msgid "UDP Tunnel Configuration"
 msgstr "UDP 隧道配置"
@@ -322,3 +322,4 @@ msgstr "已验证"
 
 msgid "Not Found"
 msgstr "未找到"
+
