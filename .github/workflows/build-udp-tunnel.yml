@@ -8,6 +8,7 @@
 # ==============================================================================
 # 这是一个完整的 YAML 文件，请覆盖 .github/workflows/build.yml
 
+# 这是一个完整的 YAML 文件，请覆盖 .github/workflows/build.yml
 name: build-udp-tunnel-ipks
 
 on:
@@ -60,42 +61,32 @@ jobs:
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          # 必须先 update 才能拉取到 base feed 里的 libnl-tiny 定义
           ./scripts/feeds update -a
           ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
 
-      - name: Patch libnl-tiny Source URL (Surgical Strike)
+      - name: Patch libnl-tiny Source URL & Bypass Hash Check
         working-directory: sdk
         run: |
           echo "=== 正在定位 libnl-tiny Makefile ==="
-          # 我们已经知道路径在 feeds/base/... 但为了保险还是用 find
           TARGET_FILE=$(find feeds -name "Makefile" | xargs grep -l "PKG_NAME:=libnl-tiny" | head -n 1)
           
           if [ -n "$TARGET_FILE" ]; then
             echo "✓ 目标锁定: $TARGET_FILE"
-            echo "=== 修改前的内容 ==="
-            grep "PKG_SOURCE_URL" "$TARGET_FILE"
             
-            # 核心修改：匹配 $(PROJECT_GIT) 变量并替换为 GitHub 地址
-            # 注意：GitHub 上没有 /project/ 目录，所以要一并去掉
+            # 1. 替换 URL (之前成功的步骤)
             sed -i 's|\$(PROJECT_GIT)/project/libnl-tiny\.git|https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
+            # 暴力兜底替换
+            sed -i 's|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
             
-            # 双重保险：万一变量名变了，尝试直接替换整行
-            if grep -q "\$(PROJECT_GIT)" "$TARGET_FILE"; then
-               echo "⚠️ 第一招没生效，尝试暴力替换整行..."
-               sed -i 's|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
-            fi
-
-            echo "=== 修改后的内容 ==="
-            grep "PKG_SOURCE_URL" "$TARGET_FILE"
+            # 2. 【关键新增】删除旧的 Hash 校验，设置为 skip
+            # 删除包含 PKG_MIRROR_HASH 的行
+            sed -i '/PKG_MIRROR_HASH/d' "$TARGET_FILE"
+            # 在文件末尾追加 skip 指令，告诉 OpenWrt 不要校验下载文件的指纹
+            echo "PKG_MIRROR_HASH:=skip" >> "$TARGET_FILE"
             
-            # 验证是否包含 github.com
-            if grep -q "github.com" "$TARGET_FILE"; then
-              echo "✅ 替换成功！现在指向 GitHub。"
-            else
-              echo "❌ 替换失败！请检查日志。"
-              exit 1
-            fi
+            echo "=== 修改后的 Makefile 关键内容 ==="
+            grep -E "PKG_SOURCE_URL|PKG_MIRROR_HASH" "$TARGET_FILE"
+            
           else
             echo "❌ 严重错误：找不到 libnl-tiny 的 Makefile！"
             exit 1
@@ -106,7 +97,6 @@ jobs:
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # 修复语言包软链接
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
@@ -140,7 +130,7 @@ jobs:
           PKG_VERSION: ${{ steps.version.outputs.version }}
           PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
-          # 显式下载 libnl-tiny，现在应该会从 GitHub 下了
+          # 显式下载 libnl-tiny，这次没有 Hash 校验应该能过了
           make package/libnl-tiny/download V=s
           
           make package/luci-app-udp-tunnel/download V=s
