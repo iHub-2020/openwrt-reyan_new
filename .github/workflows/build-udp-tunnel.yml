@@ -1,13 +1,11 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.2
+# Version: 2.5.3
 #
 # Changelog:
-#   v2.5.2 - FIXED: Explicitly download libnl-tiny source to fix 'xzcat' error
-#   v2.5.1 - FIXED: Missing lua build dependencies in SDK environment
-#          - ENHANCED: Install all feeds to ensure complete dependency chain
-#   v2.5.0 - FIXED: Root cause of 'unknown' version - pass VERSION to make
-#          - ENHANCED: Improved i18n package version detection and renaming
+#   v2.5.3 - FIXED: Force git redirect to GitHub mirrors to solve connection timeouts
+#   v2.5.2 - FIXED: Explicitly download libnl-tiny source
+#   v2.5.1 - FIXED: Missing lua build dependencies
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -51,6 +49,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
+          
+          # === 关键修复点 ===
+          # 强制将 git.openwrt.org 重定向到 GitHub 镜像
+          # 解决 Error 69 / Connection reset 问题
+          git config --global url."https://github.com/openwrt/".insteadOf "https://git.openwrt.org/project/"
           git config --global --add safe.directory '*'
 
       - name: Download and Extract OpenWrt SDK
@@ -71,11 +74,8 @@ jobs:
           
           ./scripts/feeds update -a
           
-          # 关键点1：确保 libnl-tiny 被安装到 package 目录
+          # 安装依赖包
           ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
-          
-          # Verify critical packages
-          ./scripts/feeds install lua luci-base luci-compat iptables
 
       - name: Prepare Package Sources
         run: |
@@ -105,7 +105,6 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          # 预防性下载 udp2raw 的依赖（如果有）
           make package/udp2raw/download V=s
           make package/udp2raw/compile V=s
           if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
@@ -120,8 +119,7 @@ jobs:
           PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
           echo "=== Downloading Dependencies ==="
-          # 关键点2：这里就是修复报错的地方
-          # 显式下载 libnl-tiny 的源码包，防止 xzcat 找不到文件
+          # 这里的下载现在会走 GitHub 镜像，应该能成功了
           make package/libnl-tiny/download V=s
           make package/luci-app-udp-tunnel/download V=s
           
