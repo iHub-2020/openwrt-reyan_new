@@ -1,6 +1,6 @@
 {
 	"admin/services/udp2raw": {
-		"title": "UDP Tunnel",
+		"title": "UDP Tunnel Manager",
 		"order": 90,
 		"action": {
 			"type": "firstchild"
@@ -27,3 +27,4 @@
 		}
 	}
 }
+
