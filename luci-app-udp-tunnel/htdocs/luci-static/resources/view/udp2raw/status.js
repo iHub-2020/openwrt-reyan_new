@@ -126,27 +126,31 @@ return view.extend({
 	},
 
 	/**
-	 * v2.8: 新增 - 计算二进制文件的MD5值
+	 * v2.8: 计算二进制文件的MD5值
 	 */
 	getMD5: function() {
-		return fs.exec('/usr/bin/md5sum', ['/usr/bin/udp2raw']).then(function(res) {
-			var output = (res.stdout || '').trim();
-			// md5sum 输出格式: "0aa0c2776a4adf96... /usr/bin/udp2raw"
-			var match = output.match(/^([a-f0-9]{32})/i);
-			if (match && match[1]) {
-				return { 
-					installed: true, 
-					md5: match[1].substring(0, 10) // 取前10位显示
-				};
-			}
-			throw new Error('MD5 parse failed');
-		}).catch(function() {
-			return fs.stat('/usr/bin/udp2raw').then(function() {
-				return { installed: true, md5: 'Unknown' };
-			}).catch(function() {
+		return fs.exec('/bin/sh', ['-c', 'md5sum /usr/bin/udp2raw 2>/dev/null || echo "NOTFOUND"'])
+			.then(function(res) {
+				var output = (res.stdout || '').trim();
+				
+				if (output.indexOf('NOTFOUND') === 0) {
+					throw new Error('Binary not found');
+				}
+				
+				// md5sum 输出格式: "0aa0c2776a4adf96... /usr/bin/udp2raw"
+				var match = output.match(/^([a-f0-9]{32})/i);
+				if (match && match[1]) {
+					return { 
+						installed: true, 
+						md5: match[1].substring(0, 10)  // 取前10位
+					};
+				}
+				throw new Error('MD5 parse failed');
+			})
+			.catch(function(err) {
+				// 文件不存在或无法计算MD5
 				return { installed: false, md5: null };
 			});
-		});
 	},
 
 	/**
@@ -238,7 +242,8 @@ return view.extend({
 				])
 			]),
 
-			E('div', { 'class': 'cbi-section' }, [
+			// 添加 margin-top
+			E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
 				E('h3', { 'style': 'display:flex; justify-content:space-between; align-items:center;' }, [
 					_('Recent Logs'),
 					E('span', { 'id': 'log-status', 'style': 'font-size: 0.85em;' }, '')
@@ -402,3 +407,4 @@ return view.extend({
 	handleSaveApply: null,
 	handleReset: null
 });
+
