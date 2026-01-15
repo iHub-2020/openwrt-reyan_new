@@ -36,6 +36,14 @@ var callServiceList = rpc.declare({
 	expect: { '': {} }
 });
 
+// 添加这个：
+var callInitAction = rpc.declare({
+	object: 'luci',
+	method: 'setInitAction',
+	params: ['name', 'action'],
+	expect: { result: false }
+});
+
 return view.extend({
 	title: _('UDP Tunnel Configuration'),
 	
@@ -413,7 +421,74 @@ return view.extend({
 		o.optional = true;
 		o.modalonly = true;
 		
-		return m.render();
+		//return m.render();
+		// 创建服务控制按钮区域
+		var controlDiv = E('div', { 
+			'class': 'cbi-section', 
+			'style': 'margin-top: 20px; padding: 15px; background: #2d3a4a; border-radius: 5px; text-align: center;' 
+		}, [
+			E('h3', { 'style': 'margin: 0 0 15px 0;' }, _('Service Control')),
+			E('div', { 'class': 'cbi-button-group' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-positive',
+					'click': function() {
+						ui.showModal(_('Starting Service'), [
+							E('p', { 'class': 'spinning' }, _('Starting udp2raw service...'))
+						]);
+						callInitAction('udp2raw', 'start').then(function() {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Service started successfully')), 'info');
+							window.location.reload();
+						}).catch(function(err) {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Failed to start: ') + err.message), 'error');
+						});
+					}
+				}, _('Start')),
+				
+				E('button', {
+					'class': 'cbi-button cbi-button-negative',
+					'style': 'margin-left: 10px;',
+					'click': function() {
+						ui.showModal(_('Stopping Service'), [
+							E('p', { 'class': 'spinning' }, _('Stopping udp2raw service...'))
+						]);
+						callInitAction('udp2raw', 'stop').then(function() {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Service stopped successfully')), 'info');
+							window.location.reload();
+						}).catch(function(err) {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Failed to stop: ') + err.message), 'error');
+						});
+					}
+				}, _('Stop')),
+				
+				E('button', {
+					'class': 'cbi-button cbi-button-action',
+					'style': 'margin-left: 10px;',
+					'click': function() {
+						ui.showModal(_('Restarting Service'), [
+							E('p', { 'class': 'spinning' }, _('Restarting udp2raw service...'))
+						]);
+						callInitAction('udp2raw', 'restart').then(function() {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Service restarted successfully')), 'info');
+							window.location.reload();
+						}).catch(function(err) {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Failed to restart: ') + err.message), 'error');
+						});
+					}
+				}, _('Restart'))
+			])
+		]);
+		
+		return E('div', {}, [
+			m.render(),
+			controlDiv
+		]);
 	}
 });
+
 
