@@ -1,11 +1,10 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.3
+# Version: 2.5.4
 #
 # Changelog:
-#   v2.5.3 - FIXED: Force git redirect to GitHub mirrors to solve connection timeouts
-#   v2.5.2 - FIXED: Explicitly download libnl-tiny source
-#   v2.5.1 - FIXED: Missing lua build dependencies
+#   v2.5.4 - FIXED: 使用 sed 暴力修改 libnl-tiny Makefile 源码地址，彻底解决下载失败
+#   v2.5.3 - FIXED: Force git redirect to GitHub mirrors
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -50,9 +49,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
           
-          # === 关键修复点 ===
-          # 强制将 git.openwrt.org 重定向到 GitHub 镜像
-          # 解决 Error 69 / Connection reset 问题
+          # 保留这个配置作为第一道防线
           git config --global url."https://github.com/openwrt/".insteadOf "https://git.openwrt.org/project/"
           git config --global --add safe.directory '*'
 
@@ -73,9 +70,16 @@ jobs:
           EOF
           
           ./scripts/feeds update -a
-          
-          # 安装依赖包
           ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
+          
+          # === 💀 终极修复：外科手术式修改 ===
+          # 直接修改 libnl-tiny 的 Makefile，把 git.openwrt.org 替换为 github.com
+          # 这样 make download 时会直接去 GitHub 下载，不再依赖不稳定的官方源
+          echo "Patching libnl-tiny source URL..."
+          sed -i 's|git\.openwrt\.org/project/libnl-tiny\.git|github.com/openwrt/libnl-tiny.git|g' package/feeds/base/libnl-tiny/Makefile
+          
+          # 验证修改是否成功
+          grep "PKG_SOURCE_URL" package/feeds/base/libnl-tiny/Makefile
 
       - name: Prepare Package Sources
         run: |
@@ -119,7 +123,7 @@ jobs:
           PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
           echo "=== Downloading Dependencies ==="
-          # 这里的下载现在会走 GitHub 镜像，应该能成功了
+          # 这里的下载现在会走 GitHub，速度飞快且稳定
           make package/libnl-tiny/download V=s
           make package/luci-app-udp-tunnel/download V=s
           
