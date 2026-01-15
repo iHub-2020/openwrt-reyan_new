@@ -1,11 +1,12 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.4
+# Version: 2.5.5
 #
 # Changelog:
-#   v2.5.4 - FIXED: 使用 sed 暴力修改 libnl-tiny Makefile 源码地址，彻底解决下载失败
-#   v2.5.3 - FIXED: Force git redirect to GitHub mirrors
+#   v2.5.5 - FIXED: 使用 find 命令全盘搜索并替换 Makefile，不再依赖固定路径
+#   v2.5.4 - FAILED: 路径错误，sed 未生效
 # ==============================================================================
+# 这是一个完整的 YAML 文件，请覆盖 .github/workflows/build.yml
 
 name: build-udp-tunnel-ipks
 
@@ -48,49 +49,67 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
-          
-          # 保留这个配置作为第一道防线
-          git config --global url."https://github.com/openwrt/".insteadOf "https://git.openwrt.org/project/"
           git config --global --add safe.directory '*'
 
       - name: Download and Extract OpenWrt SDK
         run: |
-          wget -q -O sdk.tar.xz ${{ matrix.sdk_url }}
+          wget -c -O sdk.tar.xz ${{ matrix.sdk_url }}
           tar -xf sdk.tar.xz
           mv ${{ matrix.sdk_name }} sdk
 
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          cat > feeds.conf << 'EOF'
-          src-git-full base https://github.com/openwrt/openwrt.git;openwrt-23.05
-          src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
-          src-git luci https://github.com/openwrt/luci.git;openwrt-23.05
-          src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
-          EOF
-          
+          # 必须先 update 才能拉取到 base feed 里的 libnl-tiny 定义
           ./scripts/feeds update -a
           ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
+
+      - name: Patch libnl-tiny Source URL (Surgical Strike)
+        working-directory: sdk
+        run: |
+          echo "=== 正在定位 libnl-tiny Makefile ==="
+          # 我们已经知道路径在 feeds/base/... 但为了保险还是用 find
+          TARGET_FILE=$(find feeds -name "Makefile" | xargs grep -l "PKG_NAME:=libnl-tiny" | head -n 1)
           
-          # === 💀 终极修复：外科手术式修改 ===
-          # 直接修改 libnl-tiny 的 Makefile，把 git.openwrt.org 替换为 github.com
-          # 这样 make download 时会直接去 GitHub 下载，不再依赖不稳定的官方源
-          echo "Patching libnl-tiny source URL..."
-          sed -i 's|git\.openwrt\.org/project/libnl-tiny\.git|github.com/openwrt/libnl-tiny.git|g' package/feeds/base/libnl-tiny/Makefile
-          
-          # 验证修改是否成功
-          grep "PKG_SOURCE_URL" package/feeds/base/libnl-tiny/Makefile
+          if [ -n "$TARGET_FILE" ]; then
+            echo "✓ 目标锁定: $TARGET_FILE"
+            echo "=== 修改前的内容 ==="
+            grep "PKG_SOURCE_URL" "$TARGET_FILE"
+            
+            # 核心修改：匹配 $(PROJECT_GIT) 变量并替换为 GitHub 地址
+            # 注意：GitHub 上没有 /project/ 目录，所以要一并去掉
+            sed -i 's|\$(PROJECT_GIT)/project/libnl-tiny\.git|https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
+            
+            # 双重保险：万一变量名变了，尝试直接替换整行
+            if grep -q "\$(PROJECT_GIT)" "$TARGET_FILE"; then
+               echo "⚠️ 第一招没生效，尝试暴力替换整行..."
+               sed -i 's|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
+            fi
+
+            echo "=== 修改后的内容 ==="
+            grep "PKG_SOURCE_URL" "$TARGET_FILE"
+            
+            # 验证是否包含 github.com
+            if grep -q "github.com" "$TARGET_FILE"; then
+              echo "✅ 替换成功！现在指向 GitHub。"
+            else
+              echo "❌ 替换失败！请检查日志。"
+              exit 1
+            fi
+          else
+            echo "❌ 严重错误：找不到 libnl-tiny 的 Makefile！"
+            exit 1
+          fi
 
       - name: Prepare Package Sources
         run: |
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # Fix Translation Symlinks
+          # 修复语言包软链接
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
-            echo "✓ Created zh-cn -> zh_Hans symlink"
           fi
 
       - name: Extract Package Version
@@ -100,7 +119,6 @@ jobs:
           PKG_RELEASE=$(grep -m1 "^PKG_RELEASE:=" luci-app-udp-tunnel/Makefile | cut -d'=' -f2)
           echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
           echo "release=${PKG_RELEASE}" >> $GITHUB_OUTPUT
-          echo "✓ Detected: v${PKG_VERSION}-${PKG_RELEASE}"
 
       - name: Configure Build
         working-directory: sdk
@@ -122,12 +140,10 @@ jobs:
           PKG_VERSION: ${{ steps.version.outputs.version }}
           PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
-          echo "=== Downloading Dependencies ==="
-          # 这里的下载现在会走 GitHub，速度飞快且稳定
+          # 显式下载 libnl-tiny，现在应该会从 GitHub 下了
           make package/libnl-tiny/download V=s
-          make package/luci-app-udp-tunnel/download V=s
           
-          echo "=== Compiling ==="
+          make package/luci-app-udp-tunnel/download V=s
           make package/luci-app-udp-tunnel/compile V=s
           
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
@@ -135,35 +151,17 @@ jobs:
             exit 1
           fi
 
-      - name: Fix I18n Package Filename (if needed)
+      - name: Fix I18n Package Filename
         working-directory: sdk
         run: |
-          echo "=== Checking I18n Package Version ==="
-          
           BROKEN_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-*unknown*.ipk" 2>/dev/null | head -n 1)
-          
           if [ -n "$BROKEN_PKG" ]; then
-            echo "⚠ Found broken package: $(basename "$BROKEN_PKG")"
-            
             MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
-            if [ -z "$MAIN_PKG" ]; then
-              echo "ERROR: Cannot find main package to extract version"
-              exit 1
-            fi
-            
             FULL_VERSION=$(basename "$MAIN_PKG" | sed 's/luci-app-udp-tunnel_\(.*\)_all\.ipk/\1/')
-            echo "✓ Correct version: $FULL_VERSION"
-            
             FIXED_PKG=$(echo "$BROKEN_PKG" | sed "s/unknown/${FULL_VERSION}/")
             mv "$BROKEN_PKG" "$FIXED_PKG"
-            echo "✓ Renamed to: $(basename "$FIXED_PKG")"
-          else
-            echo "✓ No broken i18n packages found"
+            echo "✓ Renamed i18n package to: $(basename "$FIXED_PKG")"
           fi
-          
-          echo ""
-          echo "=== Final I18n Packages ==="
-          find bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec basename {} \;
 
       - name: Organize Artifacts
         run: |
@@ -171,9 +169,6 @@ jobs:
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
-          
-          echo "=== Final Artifacts ==="
-          ls -lh artifacts/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -204,18 +199,7 @@ jobs:
           name: UDP-Tunnel ${{ steps.tag.outputs.tag }}
           body: |
             ## UDP-Tunnel 自动构建
-            
             构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
-            
-            ### 包含文件
-            - udp2raw (x86_64, aarch64)
-            - luci-app-udp-tunnel (x86_64, aarch64)  
-            - luci-i18n-udp-tunnel-zh-cn (简体中文翻译)
-            
-            ### 安装
-            ```bash
-            opkg install udp2raw*.ipk luci-app-udp-tunnel*.ipk luci-i18n-udp-tunnel*.ipk
-            ```
           files: release-files/*.ipk
           draft: false
           prerelease: false
@@ -231,7 +215,6 @@ jobs:
           age: '1 day'
           skip-tags: false
           skip-recent: 6
-
       - name: Delete Old Releases
         uses: dev-drprasad/delete-older-releases@v0.3.4
         with:
