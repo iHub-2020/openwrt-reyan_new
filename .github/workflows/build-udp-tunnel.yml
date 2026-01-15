@@ -75,12 +75,9 @@ jobs:
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # Fix Translation Symlinks (Ensure zh-cn points to zh_Hans for compatibility)
-          # This is crucial for LuCI to detect the language correctly
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
-            echo "Created zh-cn symlink."
           fi
 
       - name: Configure Build
@@ -106,33 +103,42 @@ jobs:
             exit 1
           fi
 
-      - name: Fix I18n Package Filename (Remove 'unknown')
+      - name: 🔧 FORCE FIX: Rename 'unknown' in I18n Package
         working-directory: sdk
         run: |
-          echo "=== Fixing I18n Package Version ==="
+          echo "=== 开始执行文件名暴力修复 ==="
           
-          # 1. Find the version from the main package (e.g., luci-app-udp-tunnel_2.1.0_all.ipk)
-          MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" | head -n 1)
+          # 1. 先找到主程序包，提取版本号 (例如 2.1.0)
+          # 使用 find 确保路径正确
+          MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
+          
           if [ -z "$MAIN_PKG" ]; then
-            echo "Error: Main package not found, cannot determine version."
+            echo "❌ 错误: 找不到主程序包，无法提取版本号！"
+            find bin/packages -name "*.ipk"
             exit 1
           fi
           
-          # Extract version string (e.g., 2.1.0)
-          VERSION=$(basename "$MAIN_PKG" | cut -d'_' -f2)
-          echo "Detected Version: $VERSION"
+          echo "📦 找到主程序包: $MAIN_PKG"
           
-          # 2. Find the broken i18n package (e.g., luci-i18n-udp-tunnel-zh-cn_unknown_all.ipk)
-          I18N_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-zh-cn*unknown*.ipk" | head -n 1)
+          # 提取版本号：文件名通常是 luci-app-udp-tunnel_2.1.0-1_all.ipk
+          # 我们取第一个下划线后的部分，直到下一个下划线或破折号
+          VERSION_FULL=$(basename "$MAIN_PKG" | cut -d'_' -f2)
+          echo "🏷️ 提取到的完整版本号: $VERSION_FULL"
           
-          if [ -n "$I18N_PKG" ]; then
-            # Replace 'unknown' with the actual version
-            NEW_NAME=$(echo "$I18N_PKG" | sed "s/unknown/$VERSION/")
-            mv "$I18N_PKG" "$NEW_NAME"
-            echo "✓ Renamed: $(basename "$I18N_PKG") -> $(basename "$NEW_NAME")"
-          else
-            echo "⚠ No 'unknown' i18n package found. Maybe it was built correctly?"
-          fi
+          # 2. 寻找所有带 'unknown' 的语言包
+          # 使用 -iname 忽略大小写，确保万无一失
+          find bin/packages -type f -name "*unknown*.ipk" | while read BROKEN_PKG; do
+            echo "⚠️ 发现问题文件: $BROKEN_PKG"
+            
+            # 构造新文件名：把 'unknown' 替换为刚才提取的版本号
+            NEW_PKG=$(echo "$BROKEN_PKG" | sed "s/unknown/$VERSION_FULL/")
+            
+            mv "$BROKEN_PKG" "$NEW_PKG"
+            echo "✅ 已重命名为: $(basename "$NEW_PKG")"
+          done
+          
+          echo "=== 修复结束，检查最终文件列表 ==="
+          find bin/packages -name "*.ipk"
 
       - name: Organize Artifacts
         run: |
@@ -140,9 +146,6 @@ jobs:
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
-          
-          echo "=== Artifacts ==="
-          ls -lh artifacts/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -173,18 +176,7 @@ jobs:
           name: UDP-Tunnel ${{ steps.tag.outputs.tag }}
           body: |
             ## UDP-Tunnel 自动构建
-            
             构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
-            
-            ### 包含文件
-            - udp2raw (x86_64, aarch64)
-            - luci-app-udp-tunnel (x86_64, aarch64)  
-            - luci-i18n-udp-tunnel-zh-cn (简体中文翻译)
-            
-            ### 安装
-            ```bash
-            opkg install udp2raw*.ipk luci-app-udp-tunnel*.ipk luci-i18n-udp-tunnel*.ipk
-            ```
           files: release-files/*.ipk
           draft: false
           prerelease: false
@@ -200,7 +192,6 @@ jobs:
           age: '1 day'
           skip-tags: false
           skip-recent: 6
-
       - name: Delete Old Releases
         uses: dev-drprasad/delete-older-releases@v0.3.4
         with:
