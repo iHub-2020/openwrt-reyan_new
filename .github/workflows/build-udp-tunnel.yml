@@ -1,14 +1,14 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.5
+# Version: 2.4.1
 #
 # Changelog:
-#   v2.5.5 - FIXED: 使用 find 命令全盘搜索并替换 Makefile，不再依赖固定路径
-#   v2.5.4 - FAILED: 路径错误，sed 未生效
+#   v2.4.1 - Workflow: Build UDP-Tunnel IPKs (Restored & Fixed)
+#   v2.4.0 - FIXED: Auto-repair 'unknown' version in i18n package filename
+#          - CLEANUP: Removed verbose debug steps and legacy comments
+#          - OPTIMIZED: Simplified translation symlink logic
 # ==============================================================================
-# 这是一个完整的 YAML 文件，请覆盖 .github/workflows/build.yml
 
-# 这是一个完整的 YAML 文件，请覆盖 .github/workflows/build.yml
 name: build-udp-tunnel-ipks
 
 on:
@@ -54,61 +54,35 @@ jobs:
 
       - name: Download and Extract OpenWrt SDK
         run: |
-          wget -c -O sdk.tar.xz ${{ matrix.sdk_url }}
+          wget -q -O sdk.tar.xz ${{ matrix.sdk_url }}
           tar -xf sdk.tar.xz
           mv ${{ matrix.sdk_name }} sdk
 
       - name: Update and Install Feeds
         working-directory: sdk
         run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
-
-      - name: Patch libnl-tiny Source URL & Bypass Hash Check
-        working-directory: sdk
-        run: |
-          echo "=== 正在定位 libnl-tiny Makefile ==="
-          TARGET_FILE=$(find feeds -name "Makefile" | xargs grep -l "PKG_NAME:=libnl-tiny" | head -n 1)
+          # 使用您原版 v2.4.0 的 Feeds 配置，绝对稳
+          cat > feeds.conf << 'EOF'
+          src-git-full base https://github.com/openwrt/openwrt.git;openwrt-23.05
+          src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
+          src-git luci https://github.com/openwrt/luci.git;openwrt-23.05
+          src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
+          EOF
           
-          if [ -n "$TARGET_FILE" ]; then
-            echo "✓ 目标锁定: $TARGET_FILE"
-            
-            # 1. 替换 URL (之前成功的步骤)
-            sed -i 's|\$(PROJECT_GIT)/project/libnl-tiny\.git|https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
-            # 暴力兜底替换
-            sed -i 's|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/openwrt/libnl-tiny.git|g' "$TARGET_FILE"
-            
-            # 2. 【关键新增】删除旧的 Hash 校验，设置为 skip
-            # 删除包含 PKG_MIRROR_HASH 的行
-            sed -i '/PKG_MIRROR_HASH/d' "$TARGET_FILE"
-            # 在文件末尾追加 skip 指令，告诉 OpenWrt 不要校验下载文件的指纹
-            echo "PKG_MIRROR_HASH:=skip" >> "$TARGET_FILE"
-            
-            echo "=== 修改后的 Makefile 关键内容 ==="
-            grep -E "PKG_SOURCE_URL|PKG_MIRROR_HASH" "$TARGET_FILE"
-            
-          else
-            echo "❌ 严重错误：找不到 libnl-tiny 的 Makefile！"
-            exit 1
-          fi
+          ./scripts/feeds update -a
+          # 绝对不加 libnl-tiny，只装这三个
+          ./scripts/feeds install luci-base luci-compat iptables
 
       - name: Prepare Package Sources
         run: |
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
+          # 保持原有的翻译软链接修复
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
           fi
-
-      - name: Extract Package Version
-        id: version
-        run: |
-          PKG_VERSION=$(grep -m1 "^PKG_VERSION:=" luci-app-udp-tunnel/Makefile | cut -d'=' -f2)
-          PKG_RELEASE=$(grep -m1 "^PKG_RELEASE:=" luci-app-udp-tunnel/Makefile | cut -d'=' -f2)
-          echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
-          echo "release=${PKG_RELEASE}" >> $GITHUB_OUTPUT
 
       - name: Configure Build
         working-directory: sdk
@@ -117,7 +91,6 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
-          make package/udp2raw/download V=s
           make package/udp2raw/compile V=s
           if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
             echo "ERROR: udp2raw ipk not found!"
@@ -126,14 +99,7 @@ jobs:
 
       - name: Compile luci-app-udp-tunnel
         working-directory: sdk
-        env:
-          PKG_VERSION: ${{ steps.version.outputs.version }}
-          PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
-          # 显式下载 libnl-tiny，这次没有 Hash 校验应该能过了
-          make package/libnl-tiny/download V=s
-          
-          make package/luci-app-udp-tunnel/download V=s
           make package/luci-app-udp-tunnel/compile V=s
           
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
@@ -141,17 +107,42 @@ jobs:
             exit 1
           fi
 
-      - name: Fix I18n Package Filename
+      - name: 🔧 FORCE FIX: Rename 'unknown' in I18n Package
         working-directory: sdk
         run: |
-          BROKEN_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-*unknown*.ipk" 2>/dev/null | head -n 1)
-          if [ -n "$BROKEN_PKG" ]; then
-            MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
-            FULL_VERSION=$(basename "$MAIN_PKG" | sed 's/luci-app-udp-tunnel_\(.*\)_all\.ipk/\1/')
-            FIXED_PKG=$(echo "$BROKEN_PKG" | sed "s/unknown/${FULL_VERSION}/")
-            mv "$BROKEN_PKG" "$FIXED_PKG"
-            echo "✓ Renamed i18n package to: $(basename "$FIXED_PKG")"
+          echo "=== 开始执行文件名暴力修复 ==="
+          
+          # 1. 先找到主程序包，提取版本号 (例如 2.1.0)
+          # 使用 find 确保路径正确
+          MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
+          
+          if [ -z "$MAIN_PKG" ]; then
+            echo "❌ 错误: 找不到主程序包，无法提取版本号！"
+            find bin/packages -name "*.ipk"
+            exit 1
           fi
+          
+          echo "📦 找到主程序包: $MAIN_PKG"
+          
+          # 提取版本号：文件名通常是 luci-app-udp-tunnel_2.1.0-1_all.ipk
+          # 我们取第一个下划线后的部分，直到下一个下划线或破折号
+          VERSION_FULL=$(basename "$MAIN_PKG" | cut -d'_' -f2)
+          echo "🏷️ 提取到的完整版本号: $VERSION_FULL"
+          
+          # 2. 寻找所有带 'unknown' 的语言包
+          # 使用 -iname 忽略大小写，确保万无一失
+          find bin/packages -type f -name "*unknown*.ipk" | while read BROKEN_PKG; do
+            echo "⚠️ 发现问题文件: $BROKEN_PKG"
+            
+            # 构造新文件名：把 'unknown' 替换为刚才提取的版本号
+            NEW_PKG=$(echo "$BROKEN_PKG" | sed "s/unknown/$VERSION_FULL/")
+            
+            mv "$BROKEN_PKG" "$NEW_PKG"
+            echo "✅ 已重命名为: $(basename "$NEW_PKG")"
+          done
+          
+          echo "=== 修复结束，检查最终文件列表 ==="
+          find bin/packages -name "*.ipk"
 
       - name: Organize Artifacts
         run: |
