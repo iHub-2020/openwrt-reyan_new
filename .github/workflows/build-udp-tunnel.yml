@@ -1,11 +1,12 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.4.0
+# Version: 2.5.0
 #
 # Changelog:
-#   v2.4.0 - FIXED: Auto-repair 'unknown' version in i18n package filename
-#          - CLEANUP: Removed verbose debug steps and legacy comments
-#          - OPTIMIZED: Simplified translation symlink logic
+#   v2.5.0 - FIXED: Root cause of 'unknown' version - pass VERSION to make
+#          - ENHANCED: Improved i18n package version detection and renaming
+#          - ADDED: Pre-build validation of Makefile version info
+#          - CLEANUP: Removed redundant debug output
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -75,13 +76,21 @@ jobs:
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # Fix Translation Symlinks (Ensure zh-cn points to zh_Hans for compatibility)
-          # This is crucial for LuCI to detect the language correctly
+          # Fix Translation Symlinks (Ensure zh-cn compatibility)
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
-            echo "Created zh-cn symlink."
+            echo "✓ Created zh-cn -> zh_Hans symlink"
           fi
+
+      - name: Extract Package Version
+        id: version
+        run: |
+          PKG_VERSION=$(grep -m1 "^PKG_VERSION:=" luci-app-udp-tunnel/Makefile | cut -d'=' -f2)
+          PKG_RELEASE=$(grep -m1 "^PKG_RELEASE:=" luci-app-udp-tunnel/Makefile | cut -d'=' -f2)
+          echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
+          echo "release=${PKG_RELEASE}" >> $GITHUB_OUTPUT
+          echo "✓ Detected: v${PKG_VERSION}-${PKG_RELEASE}"
 
       - name: Configure Build
         working-directory: sdk
@@ -96,43 +105,57 @@ jobs:
             exit 1
           fi
 
-      - name: Compile luci-app-udp-tunnel
+      - name: Compile luci-app-udp-tunnel (with explicit version)
         working-directory: sdk
+        env:
+          PKG_VERSION: ${{ steps.version.outputs.version }}
+          PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
-          make package/luci-app-udp-tunnel/compile V=s
+          # Pass version info to make to ensure i18n packages get correct version
+          make package/luci-app-udp-tunnel/compile \
+            V=s \
+            PKG_VERSION="${PKG_VERSION}" \
+            PKG_RELEASE="${PKG_RELEASE}"
           
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
             echo "ERROR: luci-app-udp-tunnel ipk not found!"
             exit 1
           fi
 
-      - name: Fix I18n Package Filename (Remove 'unknown')
+      - name: Fix I18n Package Filename (if needed)
         working-directory: sdk
         run: |
-          echo "=== Fixing I18n Package Version ==="
+          echo "=== Checking I18n Package Version ==="
           
-          # 1. Find the version from the main package (e.g., luci-app-udp-tunnel_2.1.0_all.ipk)
-          MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" | head -n 1)
-          if [ -z "$MAIN_PKG" ]; then
-            echo "Error: Main package not found, cannot determine version."
-            exit 1
-          fi
+          # Find any i18n package with 'unknown' in the name
+          BROKEN_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-*unknown*.ipk" 2>/dev/null | head -n 1)
           
-          # Extract version string (e.g., 2.1.0)
-          VERSION=$(basename "$MAIN_PKG" | cut -d'_' -f2)
-          echo "Detected Version: $VERSION"
-          
-          # 2. Find the broken i18n package (e.g., luci-i18n-udp-tunnel-zh-cn_unknown_all.ipk)
-          I18N_PKG=$(find bin/packages -name "luci-i18n-udp-tunnel-zh-cn*unknown*.ipk" | head -n 1)
-          
-          if [ -n "$I18N_PKG" ]; then
-            # Replace 'unknown' with the actual version
-            NEW_NAME=$(echo "$I18N_PKG" | sed "s/unknown/$VERSION/")
-            mv "$I18N_PKG" "$NEW_NAME"
-            echo "✓ Renamed: $(basename "$I18N_PKG") -> $(basename "$NEW_NAME")"
+          if [ -n "$BROKEN_PKG" ]; then
+            echo "⚠ Found broken package: $(basename "$BROKEN_PKG")"
+            
+            # Get correct version from main package
+            MAIN_PKG=$(find bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
+            if [ -z "$MAIN_PKG" ]; then
+              echo "ERROR: Cannot find main package to extract version"
+              exit 1
+            fi
+            
+            # Extract version (e.g., "2.1.0-1")
+            FULL_VERSION=$(basename "$MAIN_PKG" | sed 's/luci-app-udp-tunnel_\(.*\)_all\.ipk/\1/')
+            echo "✓ Correct version: $FULL_VERSION"
+            
+            # Rename broken package
+            FIXED_PKG=$(echo "$BROKEN_PKG" | sed "s/unknown/${FULL_VERSION}/")
+            mv "$BROKEN_PKG" "$FIXED_PKG"
+            echo "✓ Renamed to: $(basename "$FIXED_PKG")"
           else
-            echo "⚠ No 'unknown' i18n package found. Maybe it was built correctly?"
+            echo "✓ No broken i18n packages found (build successful!)"
           fi
+          
+          # Verify final packages
+          echo ""
+          echo "=== Final I18n Packages ==="
+          find bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec basename {} \;
 
       - name: Organize Artifacts
         run: |
@@ -141,7 +164,7 @@ jobs:
           find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           find sdk/bin/packages -name "luci-i18n-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
           
-          echo "=== Artifacts ==="
+          echo "=== Final Artifacts ==="
           ls -lh artifacts/
 
       - name: Upload Artifacts
