@@ -70,8 +70,8 @@ jobs:
           
           ./scripts/feeds update -a
           
-          # 只安装必要的包
-          ./scripts/feeds install lua luci-base luci-compat iptables kmod-ipt-raw
+          # 只安装必要的包: 在安装列表中添加 libnl-tiny
+          ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
           
           # Verify critical packages
           ./scripts/feeds install lua luci-base luci-compat iptables
