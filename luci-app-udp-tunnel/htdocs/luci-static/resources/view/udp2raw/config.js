@@ -9,16 +9,17 @@
  * - Tabbed interface (Basic/Advanced) for cleaner UI
  * - Input validation with security warnings
  * - Automatic iptables rule management for OpenWrt
+ * - Integrated service control with dynamic Start/Stop toggle
  * 
  * @module luci-app-udp-tunnel/config
- * @version 1.9.1
- * @date 2026-01-12
+ * @version 1.9.8
+ * @date 2026-01-15
  * 
  * Changelog:
- *   v1.9.1 - CRITICAL FIX: Added 'rmempty = false' to instance enabled flags.
- *            Prevents LuCI from removing the option when it matches default '1',
- *            which caused the init script to fallback to '0' (disabled).
- *   v1.9.0 - UI Restoration & Optimization.
+ *   v1.9.8 - FIX: Button stability - periodic check + immediate application
+ *   v1.9.7 - FIX: Button position stability - use onclick property instead of clone
+ *   v1.9.6 - FIX: Button click handler - replace event listener completely
+ *   v1.9.5 - FIX: MutationObserver TypeError - use requestAnimationFrame instead
  */
 
 'use strict';
@@ -36,7 +37,6 @@ var callServiceList = rpc.declare({
 	expect: { '': {} }
 });
 
-// 添加这个：
 var callInitAction = rpc.declare({
 	object: 'luci',
 	method: 'setInitAction',
@@ -114,7 +114,7 @@ return view.extend({
 					])
 				])
 			]),
-			// Safety Warning (Restored 4 points)
+			// Safety Warning
 			E('div', { 'class': 'alert-message warning', 'style': 'margin-bottom: 20px;' }, [
 				E('h4', { 'style': 'margin: 0 0 10px 0;' }, '⚠️ ' + _('Critical Safety Information')),
 				E('ul', { 'style': 'margin: 0; padding-left: 20px;' }, [
@@ -132,28 +132,23 @@ return view.extend({
 		s.anonymous = true;
 		s.addremove = false;
 		
-		// 1. Enable Service
 		o = s.option(form.Flag, 'enabled', _('Enable Service'),
 			_('Master switch. If disabled, no tunnels will run.'));
 		o.default = '1';
 		o.rmempty = false;
 		
-		// 2. Keep Iptables Rules
 		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rules'),
 			_('Auto-restore iptables rules if cleared by system. Recommended.'));
 		o.default = '1';
 
-		// 3. Wait for Iptables Lock (Restored)
 		o = s.option(form.Flag, 'wait_lock', _('Wait for Iptables Lock'),
 			_('Wait for xtables lock while invoking iptables. Prevents failures during boot.'));
 		o.default = '1';
 
-		// 4. Retry on Error (Restored)
 		o = s.option(form.Flag, 'retry_on_error', _('Retry on Error'),
 			_('Allow starting even if network is not ready. Recommended for auto-start.'));
 		o.default = '1';
 		
-		// 5. Log Level
 		o = s.option(form.ListValue, 'log_level', _('Log Level'));
 		o.value('1', _('Fatal'));
 		o.value('2', _('Error'));
@@ -161,7 +156,7 @@ return view.extend({
 		o.value('4', _('Info (Default)'));
 		o.default = '4';
 		
-		// ==================== 1. Server Instances (Top Priority) ====================
+		// ==================== Server Instances ====================
 		s = m.section(form.GridSection, 'server', _('Server Instances (-s)'),
 			_('<b>Server Mode:</b> OpenWrt listens for connections from remote clients.<br/>' +
 			  'Traffic Flow: Internet -> WAN Port -> [Decrypted] -> Forward To IP:Port.'));
@@ -176,7 +171,6 @@ return view.extend({
 			return alias ? (alias + ' (Server)') : _('New Server');
 		};
 		
-		// Default values for new Server
 		s.handleAdd = function(ev) {
 			var section_id = uci.add('udp2raw', 'server');
 			uci.set('udp2raw', section_id, 'enabled', '1');
@@ -188,68 +182,50 @@ return view.extend({
 			return this.renderMoreOptionsModal(section_id);
 		};
 
-		// --- Tabs Definition ---
 		s.tab('basic', _('Basic Settings'));
 		s.tab('advanced', _('Advanced Settings'));
 
-		// --- Server: Table Columns (Optimized Widths) ---
-		
-		// 1. Enable
+		// Table Columns
 		o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
 		o.default = '1';
 		o.editable = true;
 		o.width = '10%';
-		// FIX: Force writing '1' or '0' to config file, preventing fallback to default '0'
 		o.rmempty = false;
 		
-		// 2. Alias (Widened)
-		// o = s.taboption('basic', form.Value, 'alias', _('Alias'));
-		// o.placeholder = 'My Server';
-		// o.rmempty = true;
-		// o.width = '15%';
-
-		// 2. Alias - 移到模态框专用
 		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
 		o.placeholder = 'My Server';
 		o.rmempty = true;
-		o.modalonly = true;  // 只在弹窗中显示
+		o.modalonly = true;
 
-		// 3. Listen Port
 		o = s.taboption('basic', form.Value, 'local_port', _('WAN Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.width = '15%';  // 加宽
+		o.width = '15%';
 		
-		// 4. Forward Address
 		o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
 		o.datatype = 'host';
 		o.placeholder = '127.0.0.1';
 		o.rmempty = false;
 		o.width = '15%';
 		
-		// 5. Forward Port
 		o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
 		o.width = '10%';
 
-		// --- Server: Hidden Options (Modal Only) ---
-
-		// Password
+		// Modal Only Options
 		o = s.taboption('basic', form.Value, 'key', _('Password (-k)'), 
 			_('Encryption password. Must match client configuration exactly.'));
 		o.password = true;
 		o.rmempty = false;
 		o.modalonly = true;
 
-		// Listen Address
 		o = s.taboption('basic', form.Value, 'local_addr', _('WAN Listen Address (-l)'), 
 			_('Address to listen on. Use 0.0.0.0 for all interfaces.'));
 		o.datatype = 'ipaddr';
 		o.default = '0.0.0.0';
 		o.modalonly = true;
 
-		// Advanced Options (All Modal Only)
 		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), 
 			_('Transport protocol. FakeTCP is recommended for bypassing firewalls.'));
 		o.value('faketcp', 'FakeTCP (Recommended)');
@@ -284,7 +260,7 @@ return view.extend({
 		o.optional = true;
 		o.modalonly = true;
 
-		// ==================== 2. Client Instances ====================
+		// ==================== Client Instances ====================
 		s = m.section(form.GridSection, 'client', _('Client Instances (-c)'),
 			_('<b>Client Mode:</b> OpenWrt connects to a remote udp2raw server (VPS).<br/>' +
 			  'Traffic Flow: App -> Local Port -> [Encrypted] -> Forward To VPS IP:Port.'));
@@ -312,66 +288,49 @@ return view.extend({
 			return this.renderMoreOptionsModal(section_id);
 		};
 
-		// --- Tabs Definition ---
 		s.tab('basic', _('Basic Settings'));
 		s.tab('advanced', _('Advanced Settings'));
 
-		// --- Client: Table Columns (Optimized Widths) ---
-		
-		// 1. Enable
+		// Table Columns
 		o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
 		o.default = '1';
 		o.editable = true;
 		o.width = '10%';
-		// FIX: Force writing '1' or '0' to config file
 		o.rmempty = false;
 		
-		// 2. Alias (Widened)
-		// o = s.taboption('basic', form.Value, 'alias', _('Alias'));
-		// o.placeholder = 'My VPS';
-		// o.width = '15%';
-
-		// 2. Alias - 移到模态框专用
 		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
 		o.placeholder = 'My Client';
 		o.rmempty = true;
-		o.modalonly = true;  // 只在弹窗中显示
+		o.modalonly = true;
 		
-		// 3. VPS Address
 		o = s.taboption('basic', form.Value, 'remote_addr', _('VPS Address'));
 		o.datatype = 'host';
 		o.rmempty = false;
 		o.width = '15%';
 		
-		// 4. VPS Port
 		o = s.taboption('basic', form.Value, 'remote_port', _('VPS Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
 		o.width = '10%';
 		
-		// 5. Local Port
 		o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.width = '15%';  // 加宽
+		o.width = '15%';
 
-		// --- Client: Hidden Options (Modal Only) ---
-		
-		// Password
+		// Modal Only Options
 		o = s.taboption('basic', form.Value, 'key', _('Password (-k)'), 
 			_('Encryption password. Must match server configuration exactly.'));
 		o.password = true;
 		o.rmempty = false;
 		o.modalonly = true;
 		
-		// Local Address
 		o = s.taboption('basic', form.Value, 'local_addr', _('Local Listen Address (-l)'), 
 			_('IP to bind locally. Use 127.0.0.1 for local apps (WireGuard/OpenVPN).'));
 		o.datatype = 'ipaddr';
 		o.default = '127.0.0.1';
 		o.modalonly = true;
 
-		// Advanced Options (All Modal Only)
 		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), _('Transport protocol.'));
 		o.value('faketcp', 'FakeTCP (Recommended)');
 		o.value('udp', 'UDP');
@@ -421,74 +380,108 @@ return view.extend({
 		o.optional = true;
 		o.modalonly = true;
 		
-		//return m.render();
-		// 创建服务控制按钮区域
-		var controlDiv = E('div', { 
-			'class': 'cbi-section', 
-			'style': 'margin-top: 20px; padding: 15px; background: #2d3a4a; border-radius: 5px; text-align: center;' 
-		}, [
-			E('h3', { 'style': 'margin: 0 0 15px 0;' }, _('Service Control')),
-			E('div', { 'class': 'cbi-button-group' }, [
-				E('button', {
-					'class': 'cbi-button cbi-button-positive',
-					'click': function() {
-						ui.showModal(_('Starting Service'), [
-							E('p', { 'class': 'spinning' }, _('Starting udp2raw service...'))
-						]);
-						callInitAction('udp2raw', 'start').then(function() {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Service started successfully')), 'info');
-							window.location.reload();
-						}).catch(function(err) {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Failed to start: ') + err.message), 'error');
-						});
-					}
-				}, _('Start')),
+		// ==================== Custom Button Handlers ====================
+		// Override "Save & Apply" to auto-restart service
+		m.handleSaveApply = function(ev, mode) {
+			return this.save(function() {
+				ui.showModal(_('Applying Configuration'), [
+					E('p', { 'class': 'spinning' }, _('Saving configuration and restarting udp2raw service...'))
+				]);
 				
-				E('button', {
-					'class': 'cbi-button cbi-button-negative',
-					'style': 'margin-left: 10px;',
-					'click': function() {
-						ui.showModal(_('Stopping Service'), [
-							E('p', { 'class': 'spinning' }, _('Stopping udp2raw service...'))
-						]);
-						callInitAction('udp2raw', 'stop').then(function() {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Service stopped successfully')), 'info');
-							window.location.reload();
-						}).catch(function(err) {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Failed to stop: ') + err.message), 'error');
-						});
-					}
-				}, _('Stop')),
-				
-				E('button', {
-					'class': 'cbi-button cbi-button-action',
-					'style': 'margin-left: 10px;',
-					'click': function() {
-						ui.showModal(_('Restarting Service'), [
-							E('p', { 'class': 'spinning' }, _('Restarting udp2raw service...'))
-						]);
-						callInitAction('udp2raw', 'restart').then(function() {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Service restarted successfully')), 'info');
-							window.location.reload();
-						}).catch(function(err) {
-							ui.hideModal();
-							ui.addNotification(null, E('p', _('Failed to restart: ') + err.message), 'error');
-						});
-					}
-				}, _('Restart'))
-			])
-		]);
+				return callInitAction('udp2raw', 'restart').then(function() {
+					ui.hideModal();
+					ui.addNotification(null, E('p', _('Configuration applied and service restarted successfully')), 'info');
+					setTimeout(function() { window.location.reload(); }, 1500);
+				}).catch(function(err) {
+					ui.hideModal();
+					ui.addNotification(null, E('p', _('Failed to restart service: ') + (err.message || err)), 'error');
+				});
+			});
+		};
 		
-		return E('div', {}, [
-			m.render(),
-			controlDiv
-		]);
+		// ==================== Modify Reset Button After Render ====================
+		var originalRender = m.render.bind(m);
+		m.render = function() {
+			var mapEl = originalRender();
+			
+			// Create the click handler function
+			var handleClick = function(ev) {
+				ev.preventDefault();
+				ev.stopPropagation();
+				
+				var action = isRunning ? 'stop' : 'start';
+				var actionText = isRunning ? _('Stopping') : _('Starting');
+				var successText = isRunning 
+					? _('Service stopped successfully') 
+					: _('Service started successfully');
+				
+				ui.showModal(actionText + ' ' + _('Service'), [
+					E('p', { 'class': 'spinning' }, actionText + ' udp2raw service...')
+				]);
+				
+				callInitAction('udp2raw', action).then(function(result) {
+					ui.hideModal();
+					ui.addNotification(null, E('p', successText), 'info');
+					setTimeout(function() { 
+						window.location.reload(); 
+					}, 1500);
+				}).catch(function(err) {
+					ui.hideModal();
+					ui.addNotification(null, 
+						E('p', _('Failed to ' + action + ' service: ') + (err.message || err)), 
+						'error');
+				});
+			};
+			
+			// Function to apply button modifications
+			var applyButtonMods = function() {
+				var resetBtn = document.querySelector('.cbi-button-reset');
+				
+				if (resetBtn) {
+					// Force override onclick
+					resetBtn.onclick = handleClick;
+					
+					// Remove color classes first
+					resetBtn.classList.remove('cbi-button-positive', 'cbi-button-negative', 'cbi-button-neutral');
+					
+					// Set text and color based on service status
+					if (isRunning) {
+						resetBtn.textContent = '停止进程';
+						resetBtn.classList.add('cbi-button-negative');
+						resetBtn.title = _('Stop udp2raw service without saving changes');
+					} else {
+						resetBtn.textContent = '启动进程';
+						resetBtn.classList.add('cbi-button-positive');
+						resetBtn.title = _('Start udp2raw service without saving changes');
+					}
+					
+					return true;
+				}
+				return false;
+			};
+			
+			// Apply immediately after render
+			requestAnimationFrame(function() {
+				var attempts = 0;
+				var maxAttempts = 30;
+				
+				var tryApply = function() {
+					if (applyButtonMods()) {
+						// Success - now set up periodic check (but reduce frequency)
+						setInterval(applyButtonMods, 1000);
+					} else if (attempts < maxAttempts) {
+						attempts++;
+						requestAnimationFrame(tryApply);
+					}
+				};
+				
+				tryApply();
+			});
+			
+			return mapEl;
+		};
+		
+		// ==================== Final Render ====================
+		return m.render();
 	}
 });
-
-
