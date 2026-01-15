@@ -1,8 +1,9 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.1
+# Version: 2.5.2
 #
 # Changelog:
+#   v2.5.2 - FIXED: Explicitly download libnl-tiny source to fix 'xzcat' error
 #   v2.5.1 - FIXED: Missing lua build dependencies in SDK environment
 #          - ENHANCED: Install all feeds to ensure complete dependency chain
 #   v2.5.0 - FIXED: Root cause of 'unknown' version - pass VERSION to make
@@ -70,7 +71,7 @@ jobs:
           
           ./scripts/feeds update -a
           
-          # 只安装必要的包: 在安装列表中添加 libnl-tiny
+          # 关键点1：确保 libnl-tiny 被安装到 package 目录
           ./scripts/feeds install libnl-tiny lua luci-base luci-compat iptables kmod-ipt-raw
           
           # Verify critical packages
@@ -104,6 +105,8 @@ jobs:
       - name: Compile udp2raw
         working-directory: sdk
         run: |
+          # 预防性下载 udp2raw 的依赖（如果有）
+          make package/udp2raw/download V=s
           make package/udp2raw/compile V=s
           if ! find bin/packages -name "udp2raw*.ipk" | grep -q .; then
             echo "ERROR: udp2raw ipk not found!"
@@ -116,6 +119,13 @@ jobs:
           PKG_VERSION: ${{ steps.version.outputs.version }}
           PKG_RELEASE: ${{ steps.version.outputs.release }}
         run: |
+          echo "=== Downloading Dependencies ==="
+          # 关键点2：这里就是修复报错的地方
+          # 显式下载 libnl-tiny 的源码包，防止 xzcat 找不到文件
+          make package/libnl-tiny/download V=s
+          make package/luci-app-udp-tunnel/download V=s
+          
+          echo "=== Compiling ==="
           make package/luci-app-udp-tunnel/compile V=s
           
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
