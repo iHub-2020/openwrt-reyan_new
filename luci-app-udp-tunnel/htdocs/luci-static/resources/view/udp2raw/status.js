@@ -5,10 +5,12 @@
  * Displays real-time tunnel status, connection info, and diagnostics
  * 
  * @module luci-app-udp-tunnel/status
- * @version 2.7
- * @date 2026-01-12
+ * @version 2.8
+ * @date 2026-01-15
  * 
  * Changelog:
+ *   v2.8   - Changed "Core Binary" to display actual MD5 checksum instead of version
+ *          - Added getMD5() function to calculate /usr/bin/udp2raw MD5 hash
  *   v2.7   - Fixed Iptables Rules to display ACTUAL chain names (e.g. udp2rawDwrW_...) instead of count
  *          - Fixed "Last updated" text color by removing inline styles completely
  *   v2.6   - Reverted label to "Iptables Rules"
@@ -123,56 +125,48 @@ return view.extend({
 		});
 	},
 
-	getVersion: function() {
-		var checkBin = function(path) {
-			return fs.exec(path, ['-h']).then(function(res) {
-				var output = (res.stdout || '') + (res.stderr || '');
-				var match = output.match(/git\s*version\s*:?\s*([a-f0-9]+)/i);
-				if (!match) {
-					match = output.match(/version\s*:?\s*([^\s,]+)/i);
-				}
-				if (match && match[1]) return { installed: true, version: match[1] };
-				if (output.length > 10) return { installed: true, version: 'Unknown' };
-				throw new Error('No output');
-			});
-		};
-
-		return checkBin('/usr/bin/udp2raw').catch(function() {
-			return fs.exec('/bin/sh', ['-c', 'which udp2raw']).then(function(res) {
-				var p = (res.stdout || '').trim();
-				if (p) return checkBin(p);
-				throw new Error('Not found');
-			});
+	/**
+	 * v2.8: 新增 - 计算二进制文件的MD5值
+	 */
+	getMD5: function() {
+		return fs.exec('/usr/bin/md5sum', ['/usr/bin/udp2raw']).then(function(res) {
+			var output = (res.stdout || '').trim();
+			// md5sum 输出格式: "0aa0c2776a4adf96... /usr/bin/udp2raw"
+			var match = output.match(/^([a-f0-9]{32})/i);
+			if (match && match[1]) {
+				return { 
+					installed: true, 
+					md5: match[1].substring(0, 10) // 取前10位显示
+				};
+			}
+			throw new Error('MD5 parse failed');
 		}).catch(function() {
-			return { installed: false, version: null };
+			return fs.stat('/usr/bin/udp2raw').then(function() {
+				return { installed: true, md5: 'Unknown' };
+			}).catch(function() {
+				return { installed: false, md5: null };
+			});
 		});
 	},
 
 	/**
-	 * 5. 检查 iptables (v2.7: 修复，直接显示 Chain 名称)
+	 * v2.7: 检查 iptables (显示实际 Chain 名称)
 	 */
 	checkIptables: function() {
 		return fs.exec('/usr/sbin/iptables-save').then(function(res) {
 			var rawOutput = res.stdout || '';
 			var statusText = _('No rules detected');
-			var statusColor = '#f0ad4e'; // orange
+			var statusColor = '#f0ad4e';
 			var present = false;
 
-			// 提取所有 :udp2raw 开头的字符串 (例如 :udp2rawDwrW_e76d91a7_C0)
-			// 正则解释: 匹配冒号开头，后面跟着 udp2raw，然后是非空字符，直到遇到空格或换行
 			var chainMatches = rawOutput.match(/:udp2raw[^\s]*/g);
 			
 			if (chainMatches && chainMatches.length > 0) {
 				present = true;
 				statusColor = '#5cb85c';
-				
-				// 去掉前面的冒号
 				var chainNames = chainMatches.map(function(s) { return s.substring(1); });
-				// 拼接显示，如果有多个，用逗号分隔
 				statusText = _('Active: ') + chainNames.join(', ');
-				
 			} else if (rawOutput.indexOf('udp2raw') !== -1) {
-				// 兜底：虽然没匹配到 Chain 定义，但有规则引用
 				present = true;
 				statusText = _('Active (Rules Detected)');
 				statusColor = '#5cb85c';
@@ -192,7 +186,7 @@ return view.extend({
 		return Promise.all([
 			this.getServiceStatus(),
 			this.getTunnelConfigs(),
-			this.getVersion(),
+			this.getMD5(),           // v2.8: 改为获取MD5
 			this.checkIptables()
 		]);
 	},
@@ -212,7 +206,6 @@ return view.extend({
 		var view = E('div', { 'class': 'cbi-map' }, [
 			E('h2', {}, _('UDP Tunnel Status')),
 			
-			// 1. Service Status
 			E('div', { 'class': 'cbi-section' }, [
 				E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
 					E('div', { 'style': 'width: 200px; font-weight: bold;' }, _('Service Status:')),
@@ -220,7 +213,6 @@ return view.extend({
 				])
 			]),
 
-			// 2. Tunnel Table
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Tunnel Status')),
 				E('table', { 'class': 'table cbi-section-table', 'id': 'tunnel-table' }, [
@@ -236,23 +228,19 @@ return view.extend({
 				])
 			]),
 
-			// 3. Diagnostics
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('System Diagnostics')),
 				E('div', { 'style': 'display: grid; grid-template-columns: 200px 1fr; gap: 10px;' }, [
 					E('div', { 'style': 'font-weight: bold;' }, _('Core Binary:')),
 					E('div', { 'id': 'diag-binary' }, _('Checking...')),
 					E('div', { 'style': 'font-weight: bold;' }, _('Iptables Rules:')),
-					// v2.7: 允许换行，防止 Chain 名称过长撑破布局
 					E('div', { 'id': 'diag-iptables', 'style': 'word-break: break-all;' }, _('Checking...'))
 				])
 			]),
 
-			// 4. Logs
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', { 'style': 'display:flex; justify-content:space-between; align-items:center;' }, [
 					_('Recent Logs'),
-					// v2.7: 彻底移除 style 属性，只保留 id，强制跟随主题颜色
 					E('span', { 'id': 'log-status', 'style': 'font-size: 0.85em;' }, '')
 				]),
 				E('textarea', {
@@ -320,10 +308,9 @@ return view.extend({
 	updateStatusView: function(view, data) {
 		var status = data[0];
 		var tunnels = data[1];
-		var versionInfo = data[2];
+		var md5Info = data[2];      // v2.8: 改为md5Info
 		var iptablesInfo = data[3];
 
-		// 1. Update Service Status
 		var statusEl = view.querySelector('#status-indicator');
 		if (statusEl) {
 			var activeCount = Object.keys(status.instances).length;
@@ -336,7 +323,6 @@ return view.extend({
 			}
 		}
 
-		// 2. Update Table
 		var table = view.querySelector('#tunnel-table');
 		if (table) {
 			while (table.rows.length > 1) { table.deleteRow(1); }
@@ -395,15 +381,16 @@ return view.extend({
 			}
 		}
 
-		// 3. Update Diagnostics
+		// v2.8: 更新显示MD5值
 		var diagBin = view.querySelector('#diag-binary');
 		if (diagBin) {
-			if (versionInfo.installed) {
-				diagBin.innerHTML = '<span style="color:#5cb85c">✓ ' + _('Verified') + ' (' + versionInfo.version + ')</span>';
+			if (md5Info.installed) {
+				diagBin.innerHTML = '<span style="color:#5cb85c">✓ ' + _('Verified') + ' (' + md5Info.md5 + ')</span>';
 			} else {
 				diagBin.innerHTML = '<span style="color:#d9534f">✗ ' + _('Not Found') + '</span>';
 			}
 		}
+
 		var diagIp = view.querySelector('#diag-iptables');
 		if (diagIp) {
 			diagIp.innerHTML = '<span style="color:' + iptablesInfo.color + '">' + 
