@@ -103,7 +103,7 @@ jobs:
             exit 1
           fi
 
-      - name: 🔧 FORCE FIX: Rename 'unknown' in I18n Package
+      - name: FORCE FIX: Rename 'unknown' in I18n Package
         working-directory: sdk
         run: |
           echo "=== 开始执行文件名暴力修复 ==="
