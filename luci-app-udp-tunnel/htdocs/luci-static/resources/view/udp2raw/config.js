@@ -195,16 +195,22 @@ return view.extend({
 		o.rmempty = false;
 		
 		// 2. Alias (Widened)
+		// o = s.taboption('basic', form.Value, 'alias', _('Alias'));
+		// o.placeholder = 'My Server';
+		// o.rmempty = true;
+		// o.width = '15%';
+
+		// 2. Alias - 移到模态框专用
 		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
 		o.placeholder = 'My Server';
 		o.rmempty = true;
-		o.width = '15%';
+		o.modalonly = true;  // 只在弹窗中显示
 
 		// 3. Listen Port
 		o = s.taboption('basic', form.Value, 'local_port', _('WAN Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.width = '10%';
+		o.width = '15%';  // 加宽
 		
 		// 4. Forward Address
 		o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
@@ -313,9 +319,15 @@ return view.extend({
 		o.rmempty = false;
 		
 		// 2. Alias (Widened)
+		// o = s.taboption('basic', form.Value, 'alias', _('Alias'));
+		// o.placeholder = 'My VPS';
+		// o.width = '15%';
+
+		// 2. Alias - 移到模态框专用
 		o = s.taboption('basic', form.Value, 'alias', _('Alias'));
-		o.placeholder = 'My VPS';
-		o.width = '15%';
+		o.placeholder = 'My Client';
+		o.rmempty = true;
+		o.modalonly = true;  // 只在弹窗中显示
 		
 		// 3. VPS Address
 		o = s.taboption('basic', form.Value, 'remote_addr', _('VPS Address'));
@@ -333,7 +345,7 @@ return view.extend({
 		o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
 		o.datatype = 'port';
 		o.rmempty = false;
-		o.width = '10%';
+		o.width = '15%';  // 加宽
 
 		// --- Client: Hidden Options (Modal Only) ---
 		
@@ -404,3 +416,4 @@ return view.extend({
 		return m.render();
 	}
 });
+
