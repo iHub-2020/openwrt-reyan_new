@@ -1,11 +1,10 @@
 # ==============================================================================
 # Workflow: Build UDP-Tunnel IPKs
-# Version: 2.5.0
+# Version: 2.6.0
 #
 # Changelog:
-#   v2.5.0 - CLEANUP: Removed "unknown" version fix (resolved in source code)
-#          - CLEANUP: Removed legacy debug comments and unused steps
-#          - STANDARD: Native luci.mk build process
+#   v2.6.0 - FIXED: Restricted artifacts to zh-cn only (no more extra languages)
+#          - FIXED: Seamlessly repair 'unknown' version during artifact collection
 # ==============================================================================
 
 name: build-udp-tunnel-ipks
@@ -72,11 +71,10 @@ jobs:
 
       - name: Prepare Package Sources
         run: |
-          # 复制源码到 SDK
           cp -R luci-app-udp-tunnel sdk/package/
           cp -R udp2raw sdk/package/
           
-          # 确保 zh-cn 软链接存在 (OpenWrt 习惯)
+          # 确保 zh-cn 软链接存在
           cd sdk/package/luci-app-udp-tunnel/po
           if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
             ln -sf zh_Hans zh-cn
@@ -100,7 +98,6 @@ jobs:
         run: |
           make package/luci-app-udp-tunnel/compile V=s
           
-          # 检查主程序包
           if ! find bin/packages -name "luci-app-udp-tunnel*.ipk" | grep -q .; then
             echo "ERROR: luci-app-udp-tunnel ipk not found!"
             exit 1
@@ -109,12 +106,32 @@ jobs:
       - name: Organize Artifacts
         run: |
           mkdir -p artifacts
-          # 收集 udp2raw 二进制包
+          
+          # 1. 收集 udp2raw (保持原样)
           find sdk/bin/packages -name "udp2raw*.ipk" -exec cp {} artifacts/ \;
-          # 收集 luci 主程序包
-          find sdk/bin/packages -name "luci-app-udp-tunnel*.ipk" -exec cp {} artifacts/ \;
-          # 收集 luci 语言包 (现在由 luci.mk 自动生成，通常名为 luci-i18n-luci-app-udp-tunnel-zh-cn...)
-          find sdk/bin/packages -name "luci-i18n-*.ipk" -exec cp {} artifacts/ \;
+          
+          # 2. 收集主程序 (同时提取版本号，用于修复语言包)
+          # 找到主文件 (排除 i18n 文件)
+          MAIN_PKG=$(find sdk/bin/packages -name "luci-app-udp-tunnel_*.ipk" ! -name "*i18n*" | head -n 1)
+          cp "$MAIN_PKG" artifacts/
+          
+          # 提取版本号 (例如从 luci-app-udp-tunnel_2.1.0-1_all.ipk 提取 2.1.0-1)
+          VERSION=$(basename "$MAIN_PKG" | cut -d'_' -f2)
+          echo "Detected Version: $VERSION"
+          
+          # 3. 收集并修复中文语言包 (只取 zh-cn，且顺手修复 unknown)
+          # 查找生成的中文包 (可能是 unknown，也可能是正常的)
+          I18N_PKG=$(find sdk/bin/packages -name "luci-i18n-udp-tunnel-zh-cn*.ipk" | head -n 1)
+          
+          if [ -f "$I18N_PKG" ]; then
+            # 构造正确的文件名
+            NEW_NAME="luci-i18n-udp-tunnel-zh-cn_${VERSION}_all.ipk"
+            # 复制并重命名到 artifacts 目录
+            cp "$I18N_PKG" "artifacts/$NEW_NAME"
+            echo "Copied and renamed: $NEW_NAME"
+          else
+            echo "Warning: zh-cn package not found!"
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
