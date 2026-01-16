@@ -12,10 +12,16 @@
  * - Integrated service control with dynamic Start/Stop toggle
  * 
  * @module luci-app-udp-tunnel/config
- * @version 1.9.8
- * @date 2026-01-15
+ * @version 2.0.0
+ * @date 2026-01-16
  * 
  * Changelog:
+ *   v2.0.0 - FIX: Aligned with official udp2raw documentation
+ *          - Added missing cipher_mode: aes128cfb
+ *          - Added missing auth_mode: md5, crc32
+ *          - Added missing raw_mode: easy-faketcp
+ *          - Added missing seq_mode: 0, 1, 2
+ *          - Changed defaults to match official: cipher_mode=aes128cbc, auth_mode=md5
  *   v1.9.8 - FIX: Button stability - periodic check + immediate application
  *   v1.9.7 - FIX: Button position stability - use onclick property instead of clone
  *   v1.9.6 - FIX: Button click handler - replace event listener completely
@@ -176,8 +182,8 @@ return view.extend({
 			uci.set('udp2raw', section_id, 'enabled', '1');
 			uci.set('udp2raw', section_id, 'local_addr', '0.0.0.0');
 			uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
-			uci.set('udp2raw', section_id, 'cipher_mode', 'xor');
-			uci.set('udp2raw', section_id, 'auth_mode', 'simple');
+			uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
+			uci.set('udp2raw', section_id, 'auth_mode', 'md5');
 			uci.set('udp2raw', section_id, 'auto_rule', '1');
 			return this.renderMoreOptionsModal(section_id);
 		};
@@ -227,27 +233,31 @@ return view.extend({
 		o.modalonly = true;
 
 		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), 
-			_('Transport protocol. FakeTCP is recommended for bypassing firewalls.'));
-		o.value('faketcp', 'FakeTCP (Recommended)');
+			_('Transport protocol. Official default is faketcp.'));
+		o.value('faketcp', 'FakeTCP (Default)');
+		o.value('easy-faketcp', 'Easy-FakeTCP');
 		o.value('udp', 'UDP');
 		o.value('icmp', 'ICMP');
 		o.default = 'faketcp';
 		o.modalonly = true;
 		
 		o = s.taboption('advanced', form.ListValue, 'cipher_mode', _('Cipher Mode'),
-			_('Encryption method. XOR is fast and usually sufficient.'));
-		o.value('aes128cbc', 'AES-128-CBC (Secure)');
+			_('Encryption algorithm. Official default is aes128cbc.'));
+		o.value('aes128cbc', 'AES-128-CBC (Default)');
+		o.value('aes128cfb', 'AES-128-CFB');
 		o.value('xor', 'XOR (Fast)');
-		o.value('none', 'None');
-		o.default = 'xor';
+		o.value('none', 'None (Debug Only)');
+		o.default = 'aes128cbc';
 		o.modalonly = true;
 		
 		o = s.taboption('advanced', form.ListValue, 'auth_mode', _('Auth Mode'),
-			_('Authentication method. Simple is basic protection.'));
-		o.value('hmac_sha1', 'HMAC-SHA1 (Secure)');
-		o.value('simple', 'Simple (Basic)');
-		o.value('none', 'None');
-		o.default = 'simple';
+			_('Authentication algorithm. Official default is md5.'));
+		o.value('hmac_sha1', 'HMAC-SHA1');
+		o.value('md5', 'MD5 (Default)');
+		o.value('crc32', 'CRC32');
+		o.value('simple', 'Simple');
+		o.value('none', 'None (Debug Only)');
+		o.default = 'md5';
 		o.modalonly = true;
 		
 		o = s.taboption('advanced', form.Flag, 'auto_rule', _('Auto Add Iptables Rule (-a)'),
@@ -281,8 +291,8 @@ return view.extend({
 			uci.set('udp2raw', section_id, 'local_addr', '127.0.0.1');
 			uci.set('udp2raw', section_id, 'local_port', '3333');
 			uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
-			uci.set('udp2raw', section_id, 'cipher_mode', 'xor');
-			uci.set('udp2raw', section_id, 'auth_mode', 'simple');
+			uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
+			uci.set('udp2raw', section_id, 'auth_mode', 'md5');
 			uci.set('udp2raw', section_id, 'auto_rule', '1');
 			uci.set('udp2raw', section_id, 'seq_mode', '3');
 			return this.renderMoreOptionsModal(section_id);
@@ -331,25 +341,32 @@ return view.extend({
 		o.default = '127.0.0.1';
 		o.modalonly = true;
 
-		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), _('Transport protocol.'));
-		o.value('faketcp', 'FakeTCP (Recommended)');
+		o = s.taboption('advanced', form.ListValue, 'raw_mode', _('Raw Mode'), 
+			_('Transport protocol. Official default is faketcp.'));
+		o.value('faketcp', 'FakeTCP (Default)');
+		o.value('easy-faketcp', 'Easy-FakeTCP');
 		o.value('udp', 'UDP');
 		o.value('icmp', 'ICMP');
 		o.default = 'faketcp';
 		o.modalonly = true;
 		
-		o = s.taboption('advanced', form.ListValue, 'cipher_mode', _('Cipher Mode'));
-		o.value('aes128cbc', 'AES-128-CBC');
+		o = s.taboption('advanced', form.ListValue, 'cipher_mode', _('Cipher Mode'),
+			_('Encryption algorithm. Official default is aes128cbc.'));
+		o.value('aes128cbc', 'AES-128-CBC (Default)');
+		o.value('aes128cfb', 'AES-128-CFB');
 		o.value('xor', 'XOR (Fast)');
-		o.value('none', 'None');
-		o.default = 'xor';
+		o.value('none', 'None (Debug Only)');
+		o.default = 'aes128cbc';
 		o.modalonly = true;
 		
-		o = s.taboption('advanced', form.ListValue, 'auth_mode', _('Auth Mode'));
+		o = s.taboption('advanced', form.ListValue, 'auth_mode', _('Auth Mode'),
+			_('Authentication algorithm. Official default is md5.'));
 		o.value('hmac_sha1', 'HMAC-SHA1');
+		o.value('md5', 'MD5 (Default)');
+		o.value('crc32', 'CRC32');
 		o.value('simple', 'Simple');
-		o.value('none', 'None');
-		o.default = 'simple';
+		o.value('none', 'None (Debug Only)');
+		o.default = 'md5';
 		o.modalonly = true;
 		
 		o = s.taboption('advanced', form.Value, 'source_ip', _('Source IP (--source-ip)'),
@@ -369,9 +386,13 @@ return view.extend({
 		o.default = '1';
 		o.modalonly = true;
 		
-		o = s.taboption('advanced', form.ListValue, 'seq_mode', _('Sequence Mode'), _('FakeTCP behavior simulation.'));
-		o.value('3', _('3 - Simulate real TCP (Recommended)'));
-		o.value('4', _('4 - Like 3, no Window Scale'));
+		o = s.taboption('advanced', form.ListValue, 'seq_mode', _('Sequence Mode'), 
+			_('Seq increase mode for FakeTCP. Official default is mode 3.'));
+		o.value('0', _('0 - Static header, no seq increase'));
+		o.value('1', _('1 - Increase seq every packet'));
+		o.value('2', _('2 - Increase seq randomly (~every 3 packets)'));
+		o.value('3', _('3 - Simulate real seq/ack (Default)'));
+		o.value('4', _('4 - Like 3, ignore Window Scale'));
 		o.default = '3';
 		o.depends('raw_mode', 'faketcp');
 		o.modalonly = true;
