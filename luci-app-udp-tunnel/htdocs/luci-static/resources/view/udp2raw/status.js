@@ -26,6 +26,7 @@
 'require rpc';
 'require poll';
 
+var lastClearTime = null;
 var callServiceList = rpc.declare({
 	object: 'service',
 	method: 'list',
@@ -37,7 +38,8 @@ return view.extend({
 	title: _('UDP Tunnel Status'),
 
 	pollInterval: 5,
-
+	logPollFn: null,
+	
 	cleanText: function(str) {
 		if (!str) return '';
 		return String(str).replace(/\x1B[[0-9;]*[a-zA-Z]/g, '').trim();
@@ -119,12 +121,23 @@ return view.extend({
 			var logContent = res.stdout || '';
 			if (!logContent) return [];
 			var lines = logContent.trim().split('\n');
+			
+			// 如果点击过清理，只显示之后的日志
+			if (lastClearTime) {
+				lines = lines.filter(function(line) {
+					var match = line.match(/(\w{3}\s+\w{3}\s+\d+\s+\d+:\d+:\d+\s+\d{4})/);
+					if (match) {
+						var logTime = new Date(match[1]);
+						return logTime > lastClearTime;
+					}
+					return false;
+				});
+			}
+			
 			return lines.slice(-150).map(self.cleanText).reverse();
-		}).catch(function() {
-			return [];
 		});
 	},
-
+			
 	/**
 	 * v2.8: 计算二进制文件的MD5值
 	 */
@@ -253,20 +266,68 @@ return view.extend({
 					'readonly': 'readonly',
 					'wrap': 'off',
 					'id': 'syslog-textarea'
-				}),
+				}),				
 				E('div', { 'style': 'margin-top: 5px; text-align: right;' }, [
 					E('button', { 
+						'class': 'cbi-button cbi-button-negative', 
+						'id': 'log-stop-btn',
+						'click': function() { 
+							if (self.logPollFn) {
+								poll.remove(self.logPollFn);
+								self.logPollFn = null;
+							}
+							var logStatus = view.querySelector('#log-status');
+							if (logStatus) logStatus.textContent = _('Auto-refresh stopped');
+						}
+					}, _('Stop Refresh')),
+					' ',
+					E('button', { 
+						'class': 'cbi-button cbi-button-positive', 
+						'id': 'log-start-btn',
+						'click': function() { 
+							if (!self.logPollFn) {
+								self.logPollFn = poll.add(function() {
+									return self.getRecentLogs().then(function(logs) {
+										self.updateLogView(view, logs);
+									});
+								}, 10);
+							}
+						}
+					}, _('Start Refresh')),
+					' ',
+					E('button', { 
+						'class': 'cbi-button cbi-button-reset', 
+						'click': function() {
+							lastClearTime = new Date();
+							var ta = document.getElementById('syslog-textarea');
+							if (ta) ta.value = _('Logs cleared. Showing only new entries...');
+							ui.addNotification(null, E('p', _('Will only show logs after this point')), 'info');
+						}
+					}, _('Clear Logs')),
+					' ',
+					E('button', { 
 						'class': 'cbi-button cbi-button-apply', 
-						'click': function() { self.refreshLogs(view); }
-					}, _('Refresh Logs')),
+						'click': function() {
+							var ta = document.getElementById('syslog-textarea');
+							if (ta && ta.value) {
+								var blob = new Blob([ta.value], { type: 'text/plain' });
+								var url = URL.createObjectURL(blob);
+								var a = document.createElement('a');
+								a.href = url;
+								a.download = 'udp2raw_log_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+								a.click();
+								URL.revokeObjectURL(url);
+							}
+						}
+					}, _('Download Logs')),
 					' ',
 					E('button', { 
 						'class': 'cbi-button cbi-button-neutral', 
 						'click': function() {
 							var ta = document.getElementById('syslog-textarea');
-							if (ta) ta.scrollTop = ta.scrollHeight;
+							if (ta) ta.scrollTop = 0;  // ✅ 改为滚动到顶部
 						}
-					}, _('Scroll to Bottom'))
+					}, _('Scroll to Top'))
 				])
 			])
 		]);
@@ -300,7 +361,8 @@ return view.extend({
 		if (logTa) {
 			var newText = logs.length > 0 ? logs.join('\n') : _('No logs found.');
 			logTa.value = newText;
-			logTa.scrollTop = logTa.scrollHeight;
+			// logTa.scrollTop = logTa.scrollHeight;
+			logTa.scrollTop = 0;  // ✅ 改为滚动到顶部（最新日志）
 		}
 	
 		if (logStatus) {
