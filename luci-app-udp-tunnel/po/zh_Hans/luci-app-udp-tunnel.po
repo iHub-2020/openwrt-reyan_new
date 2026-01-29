@@ -295,6 +295,66 @@ msgstr "最近日志"
 msgid "Refresh Logs"
 msgstr "刷新日志"
 
+msgid "Scroll to Top"
+msgstr "滚动到顶部"
+
+msgid "Stop Refresh"
+msgstr "停止刷新"
+
+msgid "Start Refresh"
+msgstr "开始刷新"
+
+msgid "Clear Logs"
+msgstr "清理日志"
+
+msgid "Download Logs"
+msgstr "下载日志"
+
+msgid "Auto-refresh stopped"
+msgstr "自动刷新已停止"
+
+msgid "Logs cleared. Showing only new entries..."
+msgstr "日志已清理。仅显示新条目..."
+
+msgid "Will only show logs after this point"
+msgstr "将仅显示此时间点之后的日志"
+
+msgid "Reset Configuration"
+msgstr "重置配置"
+
+msgid "Are you sure you want to reset all UDP tunnel configurations?"
+msgstr "您确定要重置所有 UDP 隧道配置吗？"
+
+msgid "This will:"
+msgstr "这将："
+
+msgid "Clear all server and client configurations"
+msgstr "清除所有服务端和客户端配置"
+
+msgid "Stop the udp2raw service"
+msgstr "停止 udp2raw 服务"
+
+msgid "Reset general settings to defaults"
+msgstr "将常规设置重置为默认值"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Reset"
+msgstr "重置"
+
+msgid "Resetting Configuration"
+msgstr "正在重置配置"
+
+msgid "Clearing all configurations..."
+msgstr "正在清除所有配置..."
+
+msgid "Configuration reset successfully"
+msgstr "配置重置成功"
+
+msgid "Failed to reset configuration: "
+msgstr "重置配置失败："
+
 msgid "Scroll to Bottom"
 msgstr "滚动到底部"
 

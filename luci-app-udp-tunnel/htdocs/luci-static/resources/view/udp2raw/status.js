@@ -5,17 +5,8 @@
  * Displays real-time tunnel status, connection info, and diagnostics
  * 
  * @module luci-app-udp-tunnel/status
- * @version 2.8
- * @date 2026-01-15
- * 
- * Changelog:
- *   v2.8   - Changed "Core Binary" to display actual MD5 checksum instead of version
- *          - Added getMD5() function to calculate /usr/bin/udp2raw MD5 hash
- *   v2.7   - Fixed Iptables Rules to display ACTUAL chain names (e.g. udp2rawDwrW_...) instead of count
- *          - Fixed "Last updated" text color by removing inline styles completely
- *   v2.6   - Reverted label to "Iptables Rules"
- *          - Enhanced Iptables detection
- *   v2.5   - Improved "Core Binary" detection logic
+ * @version 2.9.0
+ * @date 2026-01-30
  */
 
 'use strict';

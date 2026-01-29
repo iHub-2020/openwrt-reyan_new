@@ -1,208 +1,74 @@
-# luci-app-udp-tunnel (UDP Tunnel Manager)
+# LuCI UDP Tunnel Manager
 
-LuCI support for udp2raw-tunnel - Upgraded to OpenWrt 21.02+ new LuCI architecture.
-
-## Description
-
-**UDP Tunnel Manager** is a modernized LuCI interface for udp2raw, migrated from the old CBI/Lua architecture to the new JavaScript-based architecture.
-
-udp2raw converts UDP traffic into encrypted FakeTCP/UDP/ICMP traffic, helping bypass UDP firewalls and providing stable tunneling for VPN protocols like WireGuard.
-
-**Key improvement:** This version includes OpenWrt-specific safety defaults that prevent common issues like iptables rule loss after system changes.
+A comprehensive web interface for managing UDP tunnels using udp2raw on OpenWrt routers.
 
 ## Features
 
-- ✅ Support for multiple tunnel instances (client and server modes)
-- ✅ Multiple encryption modes (AES-128-CBC, AES-128-CFB, XOR, None)
-- ✅ Multiple authentication modes (HMAC-SHA1, MD5, CRC32, Simple, None)
-- ✅ FakeTCP/UDP/ICMP/easy-faketcp transmission modes
-- ✅ **Auto iptables rule management with persistence** (`--keep-rule`)
-- ✅ **iptables lock conflict prevention** (`--wait-lock`)
-- ✅ **Network initialization retry** (`--retry-on-error`)
-- ✅ Real-time service status display with binary verification
-- ✅ Integrated log viewer
-- ✅ WireGuard integration guide
-- ✅ Modern responsive UI
-- ✅ Full Chinese (Simplified) translation
-
-## OpenWrt Safety Defaults
-
-This package automatically applies critical safety parameters for OpenWrt:
-
-| Parameter | Purpose |
-|-----------|---------|
-| `-a` | Auto-add iptables rules to block kernel TCP RST |
-| `--keep-rule` | Monitor and re-add iptables rules if cleared by other programs |
-| `--wait-lock` | Wait for xtables lock instead of failing |
-| `--retry-on-error` | Allow starting before network initialization |
-| `--disable-color` | Prevent ANSI escape codes in system logs |
-
-## Compatibility
-
-- OpenWrt 21.02+
-- OpenWrt 22.03+
-- OpenWrt 23.05+
-- OpenWrt 24.10+
+- **Multi-tunnel Support**: Configure multiple server and client instances
+- **User-friendly Interface**: Clean tabbed interface with basic/advanced settings
+- **Real-time Status**: Live monitoring of tunnel status and system diagnostics
+- **Security Features**: Input validation and safety warnings
+- **OpenWrt Integration**: Automatic iptables rule management
+- **Log Management**: Real-time log viewing with filtering and export capabilities
 
 ## Installation
 
-### Method 1: From IPK package
-
+1. Install the udp2raw backend:
 ```bash
 opkg update
 opkg install udp2raw
-opkg install luci-app-udp-tunnel_*.ipk
+```
 
-Method 2: Compile from source
-See "Build Instructions" below.
+2. Install the LuCI interface:
+```bash
+opkg install luci-app-udp-tunnel
+```
 
-Build Instructions
-Prerequisites
-bash
-# Install dependencies on Debian/Ubuntu
-sudo apt update
-sudo apt install -y build-essential clang flex bison g++ gawk \
-  gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
-  python3-distutils rsync unzip zlib1g-dev file wget
+## Configuration
 
-Compile Steps
-bash
-# 1. Download OpenWrt SDK
-cd ~
-wget https://downloads.openwrt.org/releases/23.05.2/targets/x86/64/openwrt-sdk-23.05.2-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-tar -xf openwrt-sdk-*.tar.xz
-cd openwrt-sdk-*/
+### Server Mode
+- OpenWrt listens for connections from remote clients
+- Traffic Flow: Internet → WAN Port → [Decrypted] → Forward To IP:Port
 
-# 2. Clone this project
-git clone https://github.com/iHub-2020/openwrt-reyan_new.git package/openwrt-reyan_new
+### Client Mode  
+- OpenWrt connects to a remote udp2raw server (VPS)
+- Traffic Flow: App → Local Port → [Encrypted] → Forward To VPS IP:Port
 
-# 3. Update feeds
-./scripts/feeds update -a
-./scripts/feeds install -a
+### Important Settings
 
-# 4. Configure
-make menuconfig
-# Navigate to: LuCI → Applications → luci-app-udp-tunnel
-# Select <*> or <M>
+- **Keep Iptables Rules**: Strongly recommended for OpenWrt to auto-restore rules
+- **Raw Mode**: FakeTCP recommended for bypassing firewalls
+- **Cipher Mode**: AES-128-CBC (official default) or XOR (faster)
+- **Auth Mode**: MD5 (official default) or HMAC-SHA1 (more secure)
 
-# 5. Compile
-make package/openwrt-reyan_new/luci-app-udp-tunnel/compile V=s
+## Safety Information
 
-# 6. Find IPK
-ls bin/packages/*/luci/luci-app-udp-tunnel_*.ipk
+⚠️ **Critical**: FakeTCP mode requires iptables rules to block kernel TCP RST packets. On OpenWrt, these rules may be cleared when network settings change. Always enable "Keep Iptables Rules" option.
 
-Dependencies
-udp2raw - The binary package (must be installed separately or included in build)
-luci-base - LuCI core framework
-Usage
-Access LuCI web interface
-Navigate to Services → UDP Tunnel Manager
-In Configuration tab:
-Enable the service globally
-Add tunnel instances (client or server mode)
-Configure connection parameters
-In Status tab:
-View running instances
-Check binary version and iptables rules
-View real-time logs
-Save & Apply
-WireGuard Integration
-Typical Setup (OpenWrt as WireGuard Client)
-┌─────────────────────────────────────────────────────────────────┐
-│                        OpenWrt Router                           │
-│  ┌──────────────┐     ┌──────────────┐                          │
-│  │  WireGuard   │────▶│   udp2raw    │────▶ Internet ────▶ VPS │
-│  │   Client     │ UDP │   Client     │ FakeTCP                  │
-│  │ 127.0.0.1:X  │     │ 127.0.0.1:Y  │                          │
-│  └──────────────┘     └──────────────┘                          │
-└─────────────────────────────────────────────────────────────────┘
+## Troubleshooting
 
-Configuration Steps
-udp2raw Client (on OpenWrt):
+### Common Issues
 
-Mode: Client (-c)
-Local Address: 127.0.0.1
-Local Port: e.g., 6666
-Remote Address: Your VPS IP
-Remote Port: e.g., 7777
-WireGuard Client (on OpenWrt):
+1. **Service won't start**: Check if udp2raw binary is installed
+2. **Connection fails**: Ensure passwords and modes match on both ends
+3. **Rules missing**: Enable "Keep Iptables Rules" and "Auto Add Iptables Rule"
 
-Endpoint: 127.0.0.1:6666 (points to local udp2raw)
-VPS Side:
+### Log Analysis
 
-Run udp2raw in server mode (-s)
-Run WireGuard server
-Important: Prevent Traffic Loop
-If routing all traffic (0.0.0.0/0) through VPN, add a route exception for the VPS IP:
+Use the Status page to:
+- Monitor real-time tunnel status
+- View system diagnostics
+- Check iptables rules
+- Export logs for debugging
 
-bash
-ip route add <VPS_IP>/32 via <original_gateway>
+## Version History
 
-Migration from Old Version
-If you're upgrading from the old CBI/Lua version:
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-bash
-# Backup your old configuration
-cp /etc/config/udp2raw /etc/config/udp2raw.backup
+## License
 
-# Remove old version
-opkg remove luci-app-udp2raw
+MIT License - see LICENSE file for details.
 
-# Install new version
-opkg install luci-app-udp-tunnel_*.ipk
+## Support
 
-# Review and update configuration if needed
-# New version uses 'config tunnel' instead of 'config servers'
-
-Troubleshooting
-Service won't start
-Check if udp2raw binary exists:
-
-bash
-which udp2raw
-ls -la /usr/bin/udp2raw
-
-Verify configuration:
-
-bash
-uci show udp2raw
-
-Check system log:
-
-bash
-logread | grep udp2raw
-
-Connection unstable
-Ensure --keep-rule is enabled (default in this version)
-Check if iptables rules exist:
-bash
-iptables -L -n | grep -i udp2raw
-
-Try different raw_mode (faketcp/udp/icmp)
-iptables conflicts
-If using other firewall applications, ensure --wait-lock is enabled (default in this version) to prevent lock conflicts.
-
-Changelog
-v1.1.0 (2026-01-09)
-Renamed to UDP Tunnel Manager (luci-app-udp-tunnel)
-Added OpenWrt safety defaults (--keep-rule, --wait-lock, etc.)
-Fixed UCI config type consistency (unified to config tunnel)
-Enhanced error handling and logging in init script
-Added binary existence check in status page
-Added WireGuard integration guide
-Full Chinese (Simplified) translation
-Improved validation and warning messages
-v1.0.0
-Initial release with new LuCI JavaScript architecture
-Migrated from old CBI/Lua architecture
-License
-GPL-3.0-only
-
-Author
-Based on original work by sensec
-Upgraded by: iHub-2020
-Links
-Project repository: https://github.com/iHub-2020/openwrt-reyan_new
-Original project: https://github.com/sensec/luci-app-udp2raw
-udp2raw: https://github.com/wangyu-/udp2raw
-udp2raw wiki: https://github.com/wangyu-/udp2raw/wiki
+For issues and feature requests, please visit the project repository.

@@ -9,23 +9,11 @@
  * - Tabbed interface (Basic/Advanced) for cleaner UI
  * - Input validation with security warnings
  * - Automatic iptables rule management for OpenWrt
- * - Integrated service control with dynamic Start/Stop toggle
+ * - Integrated service control with reset functionality
  * 
  * @module luci-app-udp-tunnel/config
- * @version 2.0.0
- * @date 2026-01-16
- * 
- * Changelog:
- *   v2.0.0 - FIX: Aligned with official udp2raw documentation
- *          - Added missing cipher_mode: aes128cfb
- *          - Added missing auth_mode: md5, crc32
- *          - Added missing raw_mode: easy-faketcp
- *          - Added missing seq_mode: 0, 1, 2
- *          - Changed defaults to match official: cipher_mode=aes128cbc, auth_mode=md5
- *   v1.9.8 - FIX: Button stability - periodic check + immediate application
- *   v1.9.7 - FIX: Button position stability - use onclick property instead of clone
- *   v1.9.6 - FIX: Button click handler - replace event listener completely
- *   v1.9.5 - FIX: MutationObserver TypeError - use requestAnimationFrame instead
+ * @version 2.1.0
+ * @date 2026-01-30
  */
 
 'use strict';
