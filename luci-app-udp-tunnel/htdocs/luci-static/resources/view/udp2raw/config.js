@@ -143,6 +143,22 @@ return view.extend({
 		o.default = '1';
 		o.rmempty = false;
 		
+		// Add immediate service control when toggling
+		o.write = function(section_id, formvalue) {
+			var enabled = formvalue === '1';
+			var action = enabled ? 'start' : 'stop';
+			
+			// Save the configuration first
+			uci.set('udp2raw', section_id, 'enabled', formvalue);
+			
+			// Then control the service immediately
+			callInitAction('udp2raw', action).catch(function(err) {
+				console.error('Failed to ' + action + ' service:', err);
+			});
+			
+			return formvalue;
+		};
+		
 		o = s.option(form.Flag, 'keep_rule', _('Keep Iptables Rules'),
 			_('Auto-restore iptables rules if cleared by system. Recommended.'));
 		o.default = '1';
@@ -402,20 +418,24 @@ return view.extend({
 		o.modalonly = true;
 		
 		// ==================== Custom Button Handlers ====================
-		// Override "Save & Apply" to auto-restart service
+		// Override "Save & Apply" to control service based on enabled flag
 		m.handleSaveApply = function(ev, mode) {
 			return this.save(function() {
 				ui.showModal(_('Applying Configuration'), [
-					E('p', { 'class': 'spinning' }, _('Saving configuration and restarting udp2raw service...'))
+					E('p', { 'class': 'spinning' }, _('Saving configuration...'))
 				]);
 				
-				return callInitAction('udp2raw', 'restart').then(function() {
+				// Get the enabled status from general section
+				var enabled = uci.get('udp2raw', uci.sections('udp2raw', 'general')[0]['.name'], 'enabled');
+				var action = enabled === '1' ? 'start' : 'stop';
+				
+				return callInitAction('udp2raw', action).then(function() {
 					ui.hideModal();
-					ui.addNotification(null, E('p', _('Configuration applied and service restarted successfully')), 'info');
+					ui.addNotification(null, E('p', _('Configuration applied successfully')), 'info');
 					setTimeout(function() { window.location.reload(); }, 1500);
 				}).catch(function(err) {
 					ui.hideModal();
-					ui.addNotification(null, E('p', _('Failed to restart service: ') + (err.message || err)), 'error');
+					ui.addNotification(null, E('p', _('Configuration saved but failed to control service: ') + (err.message || err)), 'error');
 				});
 			});
 		};
@@ -425,31 +445,78 @@ return view.extend({
 		m.render = function() {
 			var mapEl = originalRender();
 			
-			// Create the click handler function
-			var handleClick = function(ev) {
+			// Create the reset click handler function
+			var handleResetClick = function(ev) {
 				ev.preventDefault();
 				ev.stopPropagation();
 				
-				var action = isRunning ? 'stop' : 'start';
-				var actionText = isRunning ? _('Stopping') : _('Starting');
-				var successText = isRunning 
-					? _('Service stopped successfully') 
-					: _('Service started successfully');
-				
-				ui.showModal(actionText + ' ' + _('Service'), [
-					E('p', { 'class': 'spinning' }, actionText + ' udp2raw service...')
+				ui.showModal(_('Reset Configuration'), [
+					E('p', {}, _('Are you sure you want to reset all UDP tunnel configurations?')),
+					E('p', {}, _('This will:')),
+					E('ul', {}, [
+						E('li', {}, _('Clear all server and client configurations')),
+						E('li', {}, _('Stop the udp2raw service')),
+						E('li', {}, _('Reset general settings to defaults'))
+					]),
+					E('div', { 'class': 'right' }, [
+						E('button', {
+							'class': 'cbi-button cbi-button-neutral',
+							'click': ui.hideModal
+						}, _('Cancel')),
+						E('button', {
+							'class': 'cbi-button cbi-button-negative',
+							'click': function() {
+								ui.hideModal();
+								performReset();
+							}
+						}, _('Reset'))
+					])
+				]);
+			};
+			
+			// Function to perform the actual reset
+			var performReset = function() {
+				ui.showModal(_('Resetting Configuration'), [
+					E('p', { 'class': 'spinning' }, _('Clearing all configurations...'))
 				]);
 				
-				callInitAction('udp2raw', action).then(function(result) {
+				// Stop service first
+				callInitAction('udp2raw', 'stop').then(function() {
+					// Clear all server sections
+					var serverSections = uci.sections('udp2raw', 'server');
+					serverSections.forEach(function(section) {
+						uci.remove('udp2raw', section['.name']);
+					});
+					
+					// Clear all client sections
+					var clientSections = uci.sections('udp2raw', 'client');
+					clientSections.forEach(function(section) {
+						uci.remove('udp2raw', section['.name']);
+					});
+					
+					// Reset general section to defaults
+					var generalSections = uci.sections('udp2raw', 'general');
+					if (generalSections.length > 0) {
+						var generalSection = generalSections[0]['.name'];
+						uci.set('udp2raw', generalSection, 'enabled', '0');
+						uci.set('udp2raw', generalSection, 'keep_rule', '1');
+						uci.set('udp2raw', generalSection, 'wait_lock', '1');
+						uci.set('udp2raw', generalSection, 'retry_on_error', '1');
+						uci.set('udp2raw', generalSection, 'log_level', '4');
+					}
+					
+					// Save changes
+					return uci.save();
+				}).then(function() {
 					ui.hideModal();
-					ui.addNotification(null, E('p', successText), 'info');
+					ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
 					setTimeout(function() { 
 						window.location.reload(); 
 					}, 1500);
 				}).catch(function(err) {
 					ui.hideModal();
 					ui.addNotification(null, 
-						E('p', _('Failed to ' + action + ' service: ') + (err.message || err)), 
+						E('p', _('Failed to reset configuration: ') + (err.message || err)), 
 						'error');
 				});
 			};
@@ -460,21 +527,15 @@ return view.extend({
 				
 				if (resetBtn) {
 					// Force override onclick
-					resetBtn.onclick = handleClick;
+					resetBtn.onclick = handleResetClick;
 					
 					// Remove color classes first
 					resetBtn.classList.remove('cbi-button-positive', 'cbi-button-negative', 'cbi-button-neutral');
 					
-					// Set text and color based on service status
-					if (isRunning) {
-						resetBtn.textContent = '停止进程';
-						resetBtn.classList.add('cbi-button-negative');
-						resetBtn.title = _('Stop udp2raw service without saving changes');
-					} else {
-						resetBtn.textContent = '启动进程';
-						resetBtn.classList.add('cbi-button-positive');
-						resetBtn.title = _('Start udp2raw service without saving changes');
-					}
+					// Set text and style for reset button
+					resetBtn.textContent = '复位';
+					resetBtn.classList.add('cbi-button-neutral');
+					resetBtn.title = _('Reset all configurations to defaults');
 					
 					return true;
 				}
