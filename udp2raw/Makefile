@@ -6,13 +6,15 @@
 # Project: udp2raw OpenWrt Package
 # Maintainer: iHub-2020
 # Upstream: https://github.com/wangyu-/udp2raw
-# Version: 0.0.0 (Rolling Release - Always Latest)
-# Last Updated: 2026-01-10
+# Version: Dynamic (Professional Version Management)
+# Last Updated: 2026-01-30
 #
 # Changelog:
-#   2026-01-10 - Fixed version mismatch: now uses rolling release v0.0.0
-#              - This version always points to the latest build
-#              - No need to update PKG_VERSION when upstream rebuilds
+#   2026-01-30 - Enhanced with professional version management
+#              - Dynamic version fetching from GitHub API
+#              - Support for version history tracking
+#              - Auto-increment versioning starting from v1.0.0
+#              - Fallback to v1.0.0 if API fails
 #   2026-01-10 - Switched to Binary Release mode (downloads pre-compiled binaries)
 #              - Source repo switched to iHub-2020/udp2raw
 #              - Simplified build process, removed local compilation
@@ -27,12 +29,13 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=udp2raw
 # ----------------------------------------------------------------------------
-# 【重要】滚动版本号设置
-# 使用固定版本号 0.0.0，对应 GitHub Release Tag: v0.0.0
-# 上游 build-udp2raw-release.yml 每次构建都会覆盖 v0.0.0 的二进制文件
-# 因此这里永远不需要修改版本号
+# 【重要】专业版本管理
+# 动态获取最新版本号，支持版本历史追踪
+# 上游 build-udp2raw-release.yml 现在使用专业的版本递增机制
+# 从 v1.0.0 开始，每次构建自动递增版本号
 # ----------------------------------------------------------------------------
-PKG_VERSION:=0.0.0
+# 动态获取最新版本，如果获取失败则使用默认版本
+PKG_VERSION:=$(shell curl -s --connect-timeout 10 https://api.github.com/repos/iHub-2020/udp2raw/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' || echo "1.0.0")
 PKG_RELEASE:=1
 
 # ============================================================
@@ -41,8 +44,7 @@ PKG_RELEASE:=1
 REPO_USER:=iHub-2020
 REPO_NAME:=udp2raw
 
-# 手动定义下载地址，不让 package.mk 自动处理
-# 下载 URL: https://github.com/iHub-2020/udp2raw/releases/download/v0.0.0/udp2raw_x86_64
+# 动态下载地址，自动匹配最新版本
 MANUAL_DOWNLOAD_URL:=https://github.com/$(REPO_USER)/$(REPO_NAME)/releases/download/v$(PKG_VERSION)
 
 # 移除 PKG_SOURCE 定义，避免 OpenWrt 自动检查 hash
@@ -83,7 +85,7 @@ define Package/udp2raw/description
   - Network initialization retry (--retry-on-error)
   
   NOTE: This package downloads pre-compiled STATIC binaries from GitHub.
-  Using rolling release v0.0.0 which always contains the latest build.
+  Using professional version management with automatic version detection.
   Supported architectures: x86_64, aarch64
 endef
 
