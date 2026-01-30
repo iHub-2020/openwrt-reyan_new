@@ -384,3 +384,153 @@ msgstr "已验证"
 
 msgid "Not Found"
 msgstr "未找到"
+
+msgid "Export Servers"
+msgstr "导出服务端配置"
+
+msgid "Import Servers"
+msgstr "导入服务端配置"
+
+msgid "Export Clients"
+msgstr "导出客户端配置"
+
+msgid "Import Clients"
+msgstr "导入客户端配置"
+
+msgid "No server configurations to export"
+msgstr "没有服务端配置可导出"
+
+msgid "No client configurations to export"
+msgstr "没有客户端配置可导出"
+
+msgid "Server configurations exported successfully"
+msgstr "服务端配置导出成功"
+
+msgid "Client configurations exported successfully"
+msgstr "客户端配置导出成功"
+
+msgid "Invalid JSON file: "
+msgstr "无效的 JSON 文件："
+
+msgid "Invalid server configuration file format"
+msgstr "无效的服务端配置文件格式"
+
+msgid "Invalid client configuration file format"
+msgstr "无效的客户端配置文件格式"
+
+msgid "Import Validation Errors"
+msgstr "导入验证错误"
+
+msgid "The following errors were found:"
+msgstr "发现以下错误："
+
+msgid "Import Valid Configs"
+msgstr "导入有效配置"
+
+msgid "Config"
+msgstr "配置"
+
+msgid "Invalid WAN Listen Port"
+msgstr "无效的 WAN 监听端口"
+
+msgid "Invalid Forward To IP"
+msgstr "无效的转发到 IP"
+
+msgid "Invalid Forward To Port"
+msgstr "无效的转发到端口"
+
+msgid "Password is required"
+msgstr "密码是必需的"
+
+msgid "Invalid VPS Address"
+msgstr "无效的 VPS 地址"
+
+msgid "Invalid VPS Port"
+msgstr "无效的 VPS 端口"
+
+msgid "Invalid Local Listen Port"
+msgstr "无效的本地监听端口"
+
+msgid "Successfully imported"
+msgstr "成功导入"
+
+msgid "server configurations"
+msgstr "个服务端配置"
+
+msgid "client configurations"
+msgstr "个客户端配置"
+
+msgid "Transport protocol. Official default is faketcp."
+msgstr "传输协议。官方默认为 faketcp。"
+
+msgid "FakeTCP (Default)"
+msgstr "FakeTCP (默认)"
+
+msgid "Easy-FakeTCP"
+msgstr "Easy-FakeTCP"
+
+msgid "UDP"
+msgstr "UDP"
+
+msgid "ICMP"
+msgstr "ICMP"
+
+msgid "Encryption algorithm. Official default is aes128cbc."
+msgstr "加密算法。官方默认为 aes128cbc。"
+
+msgid "AES-128-CBC (Default)"
+msgstr "AES-128-CBC (默认)"
+
+msgid "AES-128-CFB"
+msgstr "AES-128-CFB"
+
+msgid "XOR (Fast)"
+msgstr "XOR (快速)"
+
+msgid "None (Debug Only)"
+msgstr "无 (仅调试)"
+
+msgid "Authentication algorithm. Official default is md5."
+msgstr "认证算法。官方默认为 md5。"
+
+msgid "HMAC-SHA1"
+msgstr "HMAC-SHA1"
+
+msgid "MD5 (Default)"
+msgstr "MD5 (默认)"
+
+msgid "CRC32"
+msgstr "CRC32"
+
+msgid "Simple"
+msgstr "简单"
+
+msgid "Seq increase mode for FakeTCP. Official default is mode 3."
+msgstr "FakeTCP 的序列号递增模式。官方默认为模式 3。"
+
+msgid "0 - Static header, no seq increase"
+msgstr "0 - 静态头部，序列号不递增"
+
+msgid "1 - Increase seq every packet"
+msgstr "1 - 每个数据包递增序列号"
+
+msgid "2 - Increase seq randomly (~every 3 packets)"
+msgstr "2 - 随机递增序列号（约每3个数据包）"
+
+msgid "3 - Simulate real seq/ack (Default)"
+msgstr "3 - 模拟真实序列号/确认号 (默认)"
+
+msgid "4 - Like 3, ignore Window Scale"
+msgstr "4 - 类似3，忽略窗口缩放"
+
+msgid "Configuration applied successfully"
+msgstr "配置应用成功"
+
+msgid "Configuration saved but failed to control service: "
+msgstr "配置已保存但控制服务失败："
+
+msgid "Applying Configuration"
+msgstr "应用配置中"
+
+msgid "Saving configuration..."
+msgstr "保存配置中..."

@@ -326,6 +326,13 @@ return view.extend({
 		this.updateStatusView(view, statusData);
 		this.updateLogView(view, initialLogs);
 
+		// 默认启动日志自动刷新
+		this.logPollFn = poll.add(function() {
+			return self.getRecentLogs().then(function(logs) {
+				self.updateLogView(view, logs);
+			});
+		}, 10);
+
 		poll.add(function() {
 			return self.fetchStatusData().then(function(newData) {
 				self.updateStatusView(view, newData);

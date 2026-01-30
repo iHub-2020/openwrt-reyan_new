@@ -176,6 +176,29 @@ return view.extend({
 		s.nodescriptions = true;
 		s.addbtntitle = _('Add Server');
 		
+		// Add import/export buttons for servers
+		s.addModalOptions = function(s) {
+			return [
+				E('div', { 'class': 'cbi-section-create', 'style': 'margin-bottom: 10px;' }, [
+					E('button', {
+						'class': 'cbi-button cbi-button-positive',
+						'click': function(ev) {
+							ev.preventDefault();
+							exportServerConfig();
+						}
+					}, _('Export Servers')),
+					' ',
+					E('button', {
+						'class': 'cbi-button cbi-button-apply',
+						'click': function(ev) {
+							ev.preventDefault();
+							importServerConfig();
+						}
+					}, _('Import Servers'))
+				])
+			];
+		};
+		
 		s.sectiontitle = function(section_id) {
 			var alias = uci.get('udp2raw', section_id, 'alias');
 			return alias ? (alias + ' (Server)') : _('New Server');
@@ -283,6 +306,29 @@ return view.extend({
 		s.sortable = true;
 		s.nodescriptions = true;
 		s.addbtntitle = _('Add Client');
+		
+		// Add import/export buttons for clients
+		s.addModalOptions = function(s) {
+			return [
+				E('div', { 'class': 'cbi-section-create', 'style': 'margin-bottom: 10px;' }, [
+					E('button', {
+						'class': 'cbi-button cbi-button-positive',
+						'click': function(ev) {
+							ev.preventDefault();
+							exportClientConfig();
+						}
+					}, _('Export Clients')),
+					' ',
+					E('button', {
+						'class': 'cbi-button cbi-button-apply',
+						'click': function(ev) {
+							ev.preventDefault();
+							importClientConfig();
+						}
+					}, _('Import Clients'))
+				])
+			];
+		};
 		
 		s.sectiontitle = function(section_id) {
 			var alias = uci.get('udp2raw', section_id, 'alias');
@@ -549,6 +595,291 @@ return view.extend({
 			});
 			
 			return mapEl;
+		};
+		
+		// ==================== Import/Export Functions ====================
+		
+		// Export server configurations
+		var exportServerConfig = function() {
+			var serverSections = uci.sections('udp2raw', 'server');
+			if (serverSections.length === 0) {
+				ui.addNotification(null, E('p', _('No server configurations to export')), 'warning');
+				return;
+			}
+			
+			var exportData = {
+				type: 'server',
+				version: '1.0',
+				timestamp: new Date().toISOString(),
+				configs: serverSections.map(function(section) {
+					var config = {};
+					for (var key in section) {
+						if (key !== '.anonymous' && key !== '.index' && key !== '.type') {
+							config[key] = section[key];
+						}
+					}
+					return config;
+				})
+			};
+			
+			var blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			var url = URL.createObjectURL(blob);
+			var a = document.createElement('a');
+			a.href = url;
+			a.download = 'udp2raw_servers_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+			a.click();
+			URL.revokeObjectURL(url);
+			
+			ui.addNotification(null, E('p', _('Server configurations exported successfully')), 'info');
+		};
+		
+		// Import server configurations
+		var importServerConfig = function() {
+			var input = document.createElement('input');
+			input.type = 'file';
+			input.accept = '.json';
+			input.onchange = function(e) {
+				var file = e.target.files[0];
+				if (!file) return;
+				
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					try {
+						var data = JSON.parse(e.target.result);
+						validateAndImportServers(data);
+					} catch (err) {
+						ui.addNotification(null, E('p', _('Invalid JSON file: ') + err.message), 'error');
+					}
+				};
+				reader.readAsText(file);
+			};
+			input.click();
+		};
+		
+		// Validate and import server data
+		var validateAndImportServers = function(data) {
+			if (!data || data.type !== 'server' || !Array.isArray(data.configs)) {
+				ui.addNotification(null, E('p', _('Invalid server configuration file format')), 'error');
+				return;
+			}
+			
+			var validConfigs = [];
+			var errors = [];
+			
+			data.configs.forEach(function(config, index) {
+				var error = validateServerConfig(config, index + 1);
+				if (error) {
+					errors.push(error);
+				} else {
+					validConfigs.push(config);
+				}
+			});
+			
+			if (errors.length > 0) {
+				ui.showModal(_('Import Validation Errors'), [
+					E('p', {}, _('The following errors were found:')),
+					E('ul', {}, errors.map(function(err) { return E('li', {}, err); })),
+					E('div', { 'class': 'right' }, [
+						E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Cancel')),
+						E('button', { 
+							'class': 'cbi-button cbi-button-positive',
+							'click': function() {
+								ui.hideModal();
+								if (validConfigs.length > 0) {
+									importValidServers(validConfigs);
+								}
+							}
+						}, _('Import Valid Configs') + ' (' + validConfigs.length + ')')
+					])
+				]);
+			} else {
+				importValidServers(validConfigs);
+			}
+		};
+		
+		// Validate individual server config
+		var validateServerConfig = function(config, index) {
+			if (!config.local_port || !/^\d+$/.test(config.local_port) || 
+				parseInt(config.local_port) < 1 || parseInt(config.local_port) > 65535) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid WAN Listen Port');
+			}
+			if (!config.remote_addr || !/^[\w\.-]+$/.test(config.remote_addr)) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid Forward To IP');
+			}
+			if (!config.remote_port || !/^\d+$/.test(config.remote_port) || 
+				parseInt(config.remote_port) < 1 || parseInt(config.remote_port) > 65535) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid Forward To Port');
+			}
+			if (!config.key || config.key.length < 1) {
+				return _('Config') + ' ' + index + ': ' + _('Password is required');
+			}
+			return null;
+		};
+		
+		// Import valid server configurations
+		var importValidServers = function(configs) {
+			var imported = 0;
+			configs.forEach(function(config) {
+				var section_id = uci.add('udp2raw', 'server');
+				for (var key in config) {
+					if (key !== '.name') {
+						uci.set('udp2raw', section_id, key, config[key]);
+					}
+				}
+				// Set defaults for missing fields
+				if (!config.enabled) uci.set('udp2raw', section_id, 'enabled', '1');
+				if (!config.local_addr) uci.set('udp2raw', section_id, 'local_addr', '0.0.0.0');
+				if (!config.raw_mode) uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
+				if (!config.cipher_mode) uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
+				if (!config.auth_mode) uci.set('udp2raw', section_id, 'auth_mode', 'md5');
+				if (!config.auto_rule) uci.set('udp2raw', section_id, 'auto_rule', '1');
+				imported++;
+			});
+			
+			ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('server configurations')), 'info');
+			setTimeout(function() { window.location.reload(); }, 1500);
+		};
+		
+		// Export client configurations
+		var exportClientConfig = function() {
+			var clientSections = uci.sections('udp2raw', 'client');
+			if (clientSections.length === 0) {
+				ui.addNotification(null, E('p', _('No client configurations to export')), 'warning');
+				return;
+			}
+			
+			var exportData = {
+				type: 'client',
+				version: '1.0',
+				timestamp: new Date().toISOString(),
+				configs: clientSections.map(function(section) {
+					var config = {};
+					for (var key in section) {
+						if (key !== '.anonymous' && key !== '.index' && key !== '.type') {
+							config[key] = section[key];
+						}
+					}
+					return config;
+				})
+			};
+			
+			var blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			var url = URL.createObjectURL(blob);
+			var a = document.createElement('a');
+			a.href = url;
+			a.download = 'udp2raw_clients_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+			a.click();
+			URL.revokeObjectURL(url);
+			
+			ui.addNotification(null, E('p', _('Client configurations exported successfully')), 'info');
+		};
+		
+		// Import client configurations
+		var importClientConfig = function() {
+			var input = document.createElement('input');
+			input.type = 'file';
+			input.accept = '.json';
+			input.onchange = function(e) {
+				var file = e.target.files[0];
+				if (!file) return;
+				
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					try {
+						var data = JSON.parse(e.target.result);
+						validateAndImportClients(data);
+					} catch (err) {
+						ui.addNotification(null, E('p', _('Invalid JSON file: ') + err.message), 'error');
+					}
+				};
+				reader.readAsText(file);
+			};
+			input.click();
+		};
+		
+		// Validate and import client data
+		var validateAndImportClients = function(data) {
+			if (!data || data.type !== 'client' || !Array.isArray(data.configs)) {
+				ui.addNotification(null, E('p', _('Invalid client configuration file format')), 'error');
+				return;
+			}
+			
+			var validConfigs = [];
+			var errors = [];
+			
+			data.configs.forEach(function(config, index) {
+				var error = validateClientConfig(config, index + 1);
+				if (error) {
+					errors.push(error);
+				} else {
+					validConfigs.push(config);
+				}
+			});
+			
+			if (errors.length > 0) {
+				ui.showModal(_('Import Validation Errors'), [
+					E('p', {}, _('The following errors were found:')),
+					E('ul', {}, errors.map(function(err) { return E('li', {}, err); })),
+					E('div', { 'class': 'right' }, [
+						E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Cancel')),
+						E('button', { 
+							'class': 'cbi-button cbi-button-positive',
+							'click': function() {
+								ui.hideModal();
+								if (validConfigs.length > 0) {
+									importValidClients(validConfigs);
+								}
+							}
+						}, _('Import Valid Configs') + ' (' + validConfigs.length + ')')
+					])
+				]);
+			} else {
+				importValidClients(validConfigs);
+			}
+		};
+		
+		// Validate individual client config
+		var validateClientConfig = function(config, index) {
+			if (!config.remote_addr || !/^[\w\.-]+$/.test(config.remote_addr)) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid VPS Address');
+			}
+			if (!config.remote_port || !/^\d+$/.test(config.remote_port) || 
+				parseInt(config.remote_port) < 1 || parseInt(config.remote_port) > 65535) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid VPS Port');
+			}
+			if (!config.local_port || !/^\d+$/.test(config.local_port) || 
+				parseInt(config.local_port) < 1 || parseInt(config.local_port) > 65535) {
+				return _('Config') + ' ' + index + ': ' + _('Invalid Local Listen Port');
+			}
+			if (!config.key || config.key.length < 1) {
+				return _('Config') + ' ' + index + ': ' + _('Password is required');
+			}
+			return null;
+		};
+		
+		// Import valid client configurations
+		var importValidClients = function(configs) {
+			var imported = 0;
+			configs.forEach(function(config) {
+				var section_id = uci.add('udp2raw', 'client');
+				for (var key in config) {
+					if (key !== '.name') {
+						uci.set('udp2raw', section_id, key, config[key]);
+					}
+				}
+				// Set defaults for missing fields
+				if (!config.enabled) uci.set('udp2raw', section_id, 'enabled', '1');
+				if (!config.local_addr) uci.set('udp2raw', section_id, 'local_addr', '127.0.0.1');
+				if (!config.raw_mode) uci.set('udp2raw', section_id, 'raw_mode', 'faketcp');
+				if (!config.cipher_mode) uci.set('udp2raw', section_id, 'cipher_mode', 'aes128cbc');
+				if (!config.auth_mode) uci.set('udp2raw', section_id, 'auth_mode', 'md5');
+				if (!config.auto_rule) uci.set('udp2raw', section_id, 'auto_rule', '1');
+				if (!config.seq_mode) uci.set('udp2raw', section_id, 'seq_mode', '3');
+				imported++;
+			});
+			
+			ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('client configurations')), 'info');
+			setTimeout(function() { window.location.reload(); }, 1500);
 		};
 		
 		// ==================== Final Render ====================
