@@ -123,6 +123,10 @@ return view.extend({
 					}
 					return false;
 				});
+				
+				// 在过滤后的日志开头添加高亮的清理标记
+				var clearMarker = '=== 日志已清理 (' + lastClearTime.toLocaleString() + ') ===';
+				lines.unshift(clearMarker);
 			}
 			
 			return lines.slice(-150).map(self.cleanText).reverse();
@@ -290,9 +294,10 @@ return view.extend({
 						'class': 'cbi-button cbi-button-reset', 
 						'click': function() {
 							lastClearTime = new Date();
-							var ta = document.getElementById('syslog-textarea');
-							if (ta) ta.value = _('Logs cleared. Showing only new entries...');
-							ui.addNotification(null, E('p', _('Will only show logs after this point')), 'info');
+							// 立即刷新日志以显示清理标记
+							self.getRecentLogs().then(function(logs) {
+								self.updateLogView(view, logs);
+							});
 						}
 					}, _('Clear Logs')),
 					' ',
@@ -357,10 +362,21 @@ return view.extend({
 		var logStatus = view.querySelector('#log-status');
 		
 		if (logTa) {
-			var newText = logs.length > 0 ? logs.join('\n') : _('No logs found.');
+			var newText = '';
+			if (logs.length > 0) {
+				// 检查是否有清理标记，如果有则高亮显示
+				var processedLogs = logs.map(function(line) {
+					if (line.indexOf('=== 日志已清理') === 0) {
+						return '\x1b[33m' + line + '\x1b[0m'; // 黄色高亮
+					}
+					return line;
+				});
+				newText = processedLogs.join('\n');
+			} else {
+				newText = _('No logs found.');
+			}
 			logTa.value = newText;
-			// logTa.scrollTop = logTa.scrollHeight;
-			logTa.scrollTop = 0;  // ✅ 改为滚动到顶部（最新日志）
+			logTa.scrollTop = 0;  // 滚动到顶部（最新日志）
 		}
 	
 		if (logStatus) {
