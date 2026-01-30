@@ -766,8 +766,13 @@ return view.extend({
 				imported++;
 			});
 			
-			ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('server configurations')), 'info');
-			setTimeout(function() { window.location.reload(); }, 1500);
+			// Save configurations to system
+			uci.save().then(function() {
+				ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('server configurations')), 'info');
+				setTimeout(function() { window.location.reload(); }, 1500);
+			}).catch(function(err) {
+				ui.addNotification(null, E('p', _('Failed to save imported configurations: ') + (err.message || err)), 'error');
+			});
 		};
 		
 		// Export client configurations
@@ -908,8 +913,13 @@ return view.extend({
 				imported++;
 			});
 			
-			ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('client configurations')), 'info');
-			setTimeout(function() { window.location.reload(); }, 1500);
+			// Save configurations to system
+			uci.save().then(function() {
+				ui.addNotification(null, E('p', _('Successfully imported') + ' ' + imported + ' ' + _('client configurations')), 'info');
+				setTimeout(function() { window.location.reload(); }, 1500);
+			}).catch(function(err) {
+				ui.addNotification(null, E('p', _('Failed to save imported configurations: ') + (err.message || err)), 'error');
+			});
 		};
 		
 		// ==================== Final Render ====================
