@@ -180,26 +180,37 @@ return view.extend({
 		s.renderSectionAdd = function(extra_class) {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 			
-			// Add import/export buttons after the "Add Server" button
-			var buttonContainer = E('div', { 'style': 'display: inline-block; margin-left: 10px;' }, [
-				E('button', {
-					'class': 'cbi-button cbi-button-positive',
-					'style': 'margin-right: 5px;',
-					'click': function(ev) {
-						ev.preventDefault();
-						exportServerConfig();
-					}
-				}, _('导入服务器')),
-				E('button', {
-					'class': 'cbi-button cbi-button-apply',
-					'click': function(ev) {
-						ev.preventDefault();
-						importServerConfig();
-					}
-				}, _('导出服务器'))
-			]);
+			// Create import button (styled like edit button)
+			var importBtn = E('button', {
+				'class': 'cbi-button cbi-button-positive',
+				'style': 'margin-left: 5px;',
+				'title': _('Import server configurations'),
+				'click': function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					importServerConfig();
+				}
+			}, _('导入服务器'));
 			
-			el.appendChild(buttonContainer);
+			// Create export button (styled like delete button)
+			var exportBtn = E('button', {
+				'class': 'cbi-button cbi-button-apply',
+				'style': 'margin-left: 5px;',
+				'title': _('Export server configurations'),
+				'click': function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					exportServerConfig();
+				}
+			}, _('导出服务器'));
+			
+			// Insert buttons directly into the existing button container
+			var addBtn = el.querySelector('.cbi-button-add');
+			if (addBtn && addBtn.parentNode) {
+				addBtn.parentNode.appendChild(importBtn);
+				addBtn.parentNode.appendChild(exportBtn);
+			}
+			
 			return el;
 		};
 		
@@ -315,26 +326,37 @@ return view.extend({
 		s.renderSectionAdd = function(extra_class) {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 			
-			// Add import/export buttons after the "Add Client" button
-			var buttonContainer = E('div', { 'style': 'display: inline-block; margin-left: 10px;' }, [
-				E('button', {
-					'class': 'cbi-button cbi-button-positive',
-					'style': 'margin-right: 5px;',
-					'click': function(ev) {
-						ev.preventDefault();
-						exportClientConfig();
-					}
-				}, _('导入客户端')),
-				E('button', {
-					'class': 'cbi-button cbi-button-apply',
-					'click': function(ev) {
-						ev.preventDefault();
-						importClientConfig();
-					}
-				}, _('导出客户端'))
-			]);
+			// Create import button (styled like edit button)
+			var importBtn = E('button', {
+				'class': 'cbi-button cbi-button-positive',
+				'style': 'margin-left: 5px;',
+				'title': _('Import client configurations'),
+				'click': function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					importClientConfig();
+				}
+			}, _('导入客户端'));
 			
-			el.appendChild(buttonContainer);
+			// Create export button (styled like delete button)
+			var exportBtn = E('button', {
+				'class': 'cbi-button cbi-button-apply',
+				'style': 'margin-left: 5px;',
+				'title': _('Export client configurations'),
+				'click': function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					exportClientConfig();
+				}
+			}, _('导出客户端'));
+			
+			// Insert buttons directly into the existing button container
+			var addBtn = el.querySelector('.cbi-button-add');
+			if (addBtn && addBtn.parentNode) {
+				addBtn.parentNode.appendChild(importBtn);
+				addBtn.parentNode.appendChild(exportBtn);
+			}
+			
 			return el;
 		};
 		
