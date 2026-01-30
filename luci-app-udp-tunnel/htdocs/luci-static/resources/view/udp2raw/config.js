@@ -176,27 +176,31 @@ return view.extend({
 		s.nodescriptions = true;
 		s.addbtntitle = _('Add Server');
 		
-		// Add import/export buttons for servers
-		s.addModalOptions = function(s) {
-			return [
-				E('div', { 'class': 'cbi-section-create', 'style': 'margin-bottom: 10px;' }, [
-					E('button', {
-						'class': 'cbi-button cbi-button-positive',
-						'click': function(ev) {
-							ev.preventDefault();
-							exportServerConfig();
-						}
-					}, _('Export Servers')),
-					' ',
-					E('button', {
-						'class': 'cbi-button cbi-button-apply',
-						'click': function(ev) {
-							ev.preventDefault();
-							importServerConfig();
-						}
-					}, _('Import Servers'))
-				])
-			];
+		// Override renderSectionAdd to add import/export buttons for servers
+		s.renderSectionAdd = function(extra_class) {
+			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+			
+			// Add import/export buttons after the "Add Server" button
+			var buttonContainer = E('div', { 'style': 'display: inline-block; margin-left: 10px;' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-positive',
+					'style': 'margin-right: 5px;',
+					'click': function(ev) {
+						ev.preventDefault();
+						exportServerConfig();
+					}
+				}, _('导入服务器')),
+				E('button', {
+					'class': 'cbi-button cbi-button-apply',
+					'click': function(ev) {
+						ev.preventDefault();
+						importServerConfig();
+					}
+				}, _('导出服务器'))
+			]);
+			
+			el.appendChild(buttonContainer);
+			return el;
 		};
 		
 		s.sectiontitle = function(section_id) {
@@ -307,27 +311,31 @@ return view.extend({
 		s.nodescriptions = true;
 		s.addbtntitle = _('Add Client');
 		
-		// Add import/export buttons for clients
-		s.addModalOptions = function(s) {
-			return [
-				E('div', { 'class': 'cbi-section-create', 'style': 'margin-bottom: 10px;' }, [
-					E('button', {
-						'class': 'cbi-button cbi-button-positive',
-						'click': function(ev) {
-							ev.preventDefault();
-							exportClientConfig();
-						}
-					}, _('Export Clients')),
-					' ',
-					E('button', {
-						'class': 'cbi-button cbi-button-apply',
-						'click': function(ev) {
-							ev.preventDefault();
-							importClientConfig();
-						}
-					}, _('Import Clients'))
-				])
-			];
+		// Override renderSectionAdd to add import/export buttons for clients
+		s.renderSectionAdd = function(extra_class) {
+			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+			
+			// Add import/export buttons after the "Add Client" button
+			var buttonContainer = E('div', { 'style': 'display: inline-block; margin-left: 10px;' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-positive',
+					'style': 'margin-right: 5px;',
+					'click': function(ev) {
+						ev.preventDefault();
+						exportClientConfig();
+					}
+				}, _('导入客户端')),
+				E('button', {
+					'class': 'cbi-button cbi-button-apply',
+					'click': function(ev) {
+						ev.preventDefault();
+						importClientConfig();
+					}
+				}, _('导出客户端'))
+			]);
+			
+			el.appendChild(buttonContainer);
+			return el;
 		};
 		
 		s.sectiontitle = function(section_id) {
