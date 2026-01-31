@@ -205,13 +205,28 @@ return view.extend({
                     resetBtn.textContent = '复位';
                     resetBtn.classList.add('cbi-button-negative');
 
-                    return true;  // CRITICAL: Must return true when button found
+                    return true;
                 }
-                return false;  // Return false when button not found
+                return false;
             };
 
-            // Apply modifications after a short delay to ensure DOM is ready
-            setTimeout(applyButtonMods, 100);
+            // Apply immediately after render (Strictly following udp2raw)
+            requestAnimationFrame(function () {
+                var attempts = 0;
+                var maxAttempts = 30;
+
+                var tryApply = function () {
+                    if (applyButtonMods()) {
+                        // Success - now set up periodic check (but reduce frequency)
+                        setInterval(applyButtonMods, 1000);
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        requestAnimationFrame(tryApply);
+                    }
+                };
+
+                requestAnimationFrame(tryApply);
+            });
 
             return mapEl;
         };

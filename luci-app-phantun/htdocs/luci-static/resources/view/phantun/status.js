@@ -266,12 +266,17 @@ return view.extend({
 
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
-                // Check if line contains relevant IP range AND is a rule (contains -A or -I, or implicitly from iptables-save format which doesn't always show -A for all lines but usually does, or starts with -A)
-                // iptables-save output: -A PREROUTING ...
-                if ((line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) && line.indexOf('-j') !== -1) {
-                    if (line.indexOf('MASQUERADE') !== -1) masqueradeFound = true;
-                    if (line.indexOf('DNAT') !== -1) dnatFound = true;
-                    activeRules = true;
+                // Check if line contains relevant IP range
+                // Relaxed check: Just look for IP and rule type, allow missing -j if format differs
+                if (line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) {
+                    if (line.indexOf('MASQUERADE') !== -1) {
+                        masqueradeFound = true;
+                        activeRules = true;
+                    }
+                    if (line.indexOf('DNAT') !== -1) {
+                        dnatFound = true;
+                        activeRules = true;
+                    }
                 }
             }
 
@@ -571,13 +576,10 @@ return view.extend({
             }
 
             // CRITICAL: Add status auto-refresh (not just logs)
+            // Function logic strictly copied from udp2raw: use captured view/container directly
             poll.add(function () {
                 return self.fetchStatusData().then(function (newData) {
-                    // Find the container element dynamically
-                    var statusContainer = document.querySelector('.cbi-map');
-                    if (statusContainer) {
-                        self.updateStatusView(statusContainer, newData);
-                    }
+                    self.updateStatusView(container, newData);
                 });
             }, 5);  // Refresh status every 5 seconds
         });
