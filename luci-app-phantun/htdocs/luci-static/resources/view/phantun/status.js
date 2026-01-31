@@ -383,7 +383,7 @@ return view.extend({
         var statusText = serviceStatus.running ? _('Running') : _('Stopped');
         var instanceCount = Object.keys(serviceStatus.instances).length;
 
-        var container = E('div', { 'class': 'cbi-map' }, [
+        var container = E('div', { 'class': 'cbi-map', 'id': 'phantun-status-view' }, [
             E('h2', {}, _('TCP Tunnel Status')),
 
             // ==================== Service Status (Compact) ====================
@@ -522,10 +522,8 @@ return view.extend({
                             // Immediately refresh display
                             self.pollLogs();
 
-                            // Show notification
-                            ui.addNotification(null,
-                                E('p', _('Logs cleared. Showing only new logs.')),
-                                'info', 3);
+                            // Show notification (removed per user request)
+                            // ui.addNotification(null, E('p', _('Logs cleared. Showing only new logs.')), 'info', 3);
                         }
                     }, _('Clear Logs')),
                     ' ',
@@ -576,11 +574,14 @@ return view.extend({
             }
 
             // CRITICAL: Add status auto-refresh (not just logs)
-            // Function logic strictly copied from udp2raw: use captured view/container directly
+            // CRITICAL: Final Attempt Status Refresh - Use ID-based lookup to find LIVE DOM
             poll.add(function () {
                 return self.fetchStatusData().then(function (newData) {
-                    console.log('Phantun: Polling status update...', newData);
-                    self.updateStatusView(container, newData);
+                    // Always find the CURRENT live element in the DOM
+                    var liveContainer = document.getElementById('phantun-status-view');
+                    if (liveContainer) {
+                        self.updateStatusView(liveContainer, newData);
+                    }
                 }).catch(function (err) {
                     console.error('Phantun: Poll failed', err);
                 });
