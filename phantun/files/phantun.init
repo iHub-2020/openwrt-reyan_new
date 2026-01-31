@@ -237,7 +237,7 @@ start_server() {
 	validate_server_section "$section" || {
 		logger -t phantun -p daemon.err "[$section] Server validation failed, skipping."
 		return 1
-	fi
+	}
 	
 	# Get parameters
 	config_get alias "$section" alias "$section"
