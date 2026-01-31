@@ -39,7 +39,7 @@ var callInitAction = rpc.declare({
 });
 
 return view.extend({
-    title: _('Phantun Configuration'),
+    title: _('TCP Tunnel Configuration'),
 
     load: function () {
         return Promise.all([
@@ -74,9 +74,322 @@ return view.extend({
 
         var m, s, o;
 
-        m = new form.Map('phantun', _('Phantun Configuration'),
-            _('Phantun is a lightweight UDP to TCP obfuscator. It creates TUN interfaces and requires proper iptables NAT rules. ' +
-                'Configure client mode to connect to a server, or server mode to accept client connections.'));
+        m = new form.Map('phantun', _('TCP 隧道配置'),
+            _('TCP 隧道 (Phantun) 是一个轻量级的 UDP 到 TCP 混淆工具。它创建 TUN 接口并需要正确的 iptables NAT 规则。' +
+                '配置客户端模式以连接到服务器,或配置服务器模式以接受客户端连接。'));
+
+        // ==================== Import/Export Functions ====================
+
+        // Export server configurations
+        var exportServerConfig = function () {
+            var serverSections = uci.sections('phantun', 'server');
+            if (serverSections.length === 0) {
+                return;
+            }
+
+            var exportData = {
+                type: 'server',
+                version: '1.0',
+                timestamp: new Date().toISOString(),
+                configs: serverSections.map(function (section) {
+                    var config = {};
+                    for (var key in section) {
+                        if (key !== '.anonymous' && key !== '.index' && key !== '.type') {
+                            config[key] = section[key];
+                        }
+                    }
+                    return config;
+                })
+            };
+
+            var blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'phantun_servers_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // Import server configurations
+        var importServerConfig = function () {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function (e) {
+                var file = e.target.files[0];
+                if (!file) return;
+
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        var data = JSON.parse(e.target.result);
+                        validateAndImportServers(data);
+                    } catch (err) {
+                        ui.showModal(_('Import Error'), [
+                            E('p', {}, _('Invalid JSON file: ') + err.message),
+                            E('div', { 'class': 'right' }, [
+                                E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close'))
+                            ])
+                        ]);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+
+        // Validate and import server data
+        var validateAndImportServers = function (data) {
+            if (!data || data.type !== 'server' || !Array.isArray(data.configs)) {
+                ui.showModal(_('Import Error'), [
+                    E('p', {}, _('Invalid server configuration file format')),
+                    E('div', { 'class': 'right' }, [
+                        E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close'))
+                    ])
+                ]);
+                return;
+            }
+
+            var validConfigs = [];
+            var errors = [];
+
+            data.configs.forEach(function (config, index) {
+                var error = validateServerConfig(config, index + 1);
+                if (error) {
+                    errors.push(error);
+                } else {
+                    validConfigs.push(config);
+                }
+            });
+
+            if (errors.length > 0) {
+                ui.showModal(_('Import Validation Errors'), [
+                    E('p', {}, _('The following errors were found:')),
+                    E('ul', {}, errors.map(function (err) { return E('li', {}, err); })),
+                    E('div', { 'class': 'right' }, [
+                        E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Cancel')),
+                        E('button', {
+                            'class': 'cbi-button cbi-button-positive',
+                            'click': function () {
+                                ui.hideModal();
+                                if (validConfigs.length > 0) {
+                                    importValidServers(validConfigs);
+                                }
+                            }
+                        }, _('Import Valid Configs') + ' (' + validConfigs.length + ')')
+                    ])
+                ]);
+            } else {
+                importValidServers(validConfigs);
+            }
+        };
+
+        // Validate individual server config
+        var validateServerConfig = function (config, index) {
+            if (!config.local_port || !/^\d+$/.test(config.local_port) ||
+                parseInt(config.local_port) < 1 || parseInt(config.local_port) > 65535) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid TCP Listen Port');
+            }
+            if (!config.remote_addr || !/^[\w\.-]+$/.test(config.remote_addr)) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid Forward To IP');
+            }
+            if (!config.remote_port || !/^\d+$/.test(config.remote_port) ||
+                parseInt(config.remote_port) < 1 || parseInt(config.remote_port) > 65535) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid Forward To Port');
+            }
+            return null;
+        };
+
+        // Import valid server configurations
+        var importValidServers = function (configs) {
+            var imported = 0;
+            configs.forEach(function (config) {
+                var section_id = uci.add('phantun', 'server');
+                for (var key in config) {
+                    if (key !== '.name') {
+                        uci.set('phantun', section_id, key, config[key]);
+                    }
+                }
+                // Set defaults for missing fields
+                if (!config.enabled) uci.set('phantun', section_id, 'enabled', '1');
+                if (!config.tun_local) uci.set('phantun', section_id, 'tun_local', '192.168.201.1');
+                if (!config.tun_peer) uci.set('phantun', section_id, 'tun_peer', '192.168.201.2');
+                imported++;
+            });
+
+            // Save configurations to system
+            uci.save().then(function () {
+                ui.showModal(_('Import Successful'), [
+                    E('p', {}, _('Successfully imported ') + imported + _(' server configuration(s).')),
+                    E('div', { 'class': 'right' }, [
+                        E('button', {
+                            'class': 'cbi-button cbi-button-positive',
+                            'click': function () {
+                                ui.hideModal();
+                                window.location.reload();
+                            }
+                        }, _('OK'))
+                    ])
+                ]);
+            });
+        };
+
+        // Export client configurations
+        var exportClientConfig = function () {
+            var clientSections = uci.sections('phantun', 'client');
+            if (clientSections.length === 0) {
+                return;
+            }
+
+            var exportData = {
+                type: 'client',
+                version: '1.0',
+                timestamp: new Date().toISOString(),
+                configs: clientSections.map(function (section) {
+                    var config = {};
+                    for (var key in section) {
+                        if (key !== '.anonymous' && key !== '.index' && key !== '.type') {
+                            config[key] = section[key];
+                        }
+                    }
+                    return config;
+                })
+            };
+
+            var blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'phantun_clients_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // Import client configurations
+        var importClientConfig = function () {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function (e) {
+                var file = e.target.files[0];
+                if (!file) return;
+
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        var data = JSON.parse(e.target.result);
+                        validateAndImportClients(data);
+                    } catch (err) {
+                        ui.showModal(_('Import Error'), [
+                            E('p', {}, _('Invalid JSON file: ') + err.message),
+                            E('div', { 'class': 'right' }, [
+                                E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close'))
+                            ])
+                        ]);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+
+        // Validate and import client data
+        var validateAndImportClients = function (data) {
+            if (!data || data.type !== 'client' || !Array.isArray(data.configs)) {
+                ui.showModal(_('Import Error'), [
+                    E('p', {}, _('Invalid client configuration file format')),
+                    E('div', { 'class': 'right' }, [
+                        E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close'))
+                    ])
+                ]);
+                return;
+            }
+
+            var validConfigs = [];
+            var errors = [];
+
+            data.configs.forEach(function (config, index) {
+                var error = validateClientConfig(config, index + 1);
+                if (error) {
+                    errors.push(error);
+                } else {
+                    validConfigs.push(config);
+                }
+            });
+
+            if (errors.length > 0) {
+                ui.showModal(_('Import Validation Errors'), [
+                    E('p', {}, _('The following errors were found:')),
+                    E('ul', {}, errors.map(function (err) { return E('li', {}, err); })),
+                    E('div', { 'class': 'right' }, [
+                        E('button', { 'class': 'cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Cancel')),
+                        E('button', {
+                            'class': 'cbi-button cbi-button-positive',
+                            'click': function () {
+                                ui.hideModal();
+                                if (validConfigs.length > 0) {
+                                    importValidClients(validConfigs);
+                                }
+                            }
+                        }, _('Import Valid Configs') + ' (' + validConfigs.length + ')')
+                    ])
+                ]);
+            } else {
+                importValidClients(validConfigs);
+            }
+        };
+
+        // Validate individual client config
+        var validateClientConfig = function (config, index) {
+            if (!config.remote_addr || !/^[\w\.-]+$/.test(config.remote_addr)) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid Server Address');
+            }
+            if (!config.remote_port || !/^\d+$/.test(config.remote_port) ||
+                parseInt(config.remote_port) < 1 || parseInt(config.remote_port) > 65535) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid Server Port');
+            }
+            if (!config.local_port || !/^\d+$/.test(config.local_port) ||
+                parseInt(config.local_port) < 1 || parseInt(config.local_port) > 65535) {
+                return _('Config') + ' ' + index + ': ' + _('Invalid Local Port');
+            }
+            return null;
+        };
+
+        // Import valid client configurations
+        var importValidClients = function (configs) {
+            var imported = 0;
+            configs.forEach(function (config) {
+                var section_id = uci.add('phantun', 'client');
+                for (var key in config) {
+                    if (key !== '.name') {
+                        uci.set('phantun', section_id, key, config[key]);
+                    }
+                }
+                // Set defaults for missing fields
+                if (!config.enabled) uci.set('phantun', section_id, 'enabled', '1');
+                if (!config.local_addr) uci.set('phantun', section_id, 'local_addr', '127.0.0.1');
+                if (!config.tun_local) uci.set('phantun', section_id, 'tun_local', '192.168.200.1');
+                if (!config.tun_peer) uci.set('phantun', section_id, 'tun_peer', '192.168.200.2');
+                imported++;
+            });
+
+            // Save configurations to system
+            uci.save().then(function () {
+                ui.showModal(_('Import Successful'), [
+                    E('p', {}, _('Successfully imported ') + imported + _(' client configuration(s).')),
+                    E('div', { 'class': 'right' }, [
+                        E('button', {
+                            'class': 'cbi-button cbi-button-positive',
+                            'click': function () {
+                                ui.hideModal();
+                                window.location.reload();
+                            }
+                        }, _('OK'))
+                    ])
+                ]);
+            });
+        };
 
         // ==================== Service Status Logic ====================
         var isRunning = false;
@@ -167,7 +480,7 @@ return view.extend({
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    ui.addNotification(null, E('p', _('导入功能开发中...')), 'info');
+                    importServerConfig();
                 }
             }, _('导入服务器'));
 
@@ -179,7 +492,7 @@ return view.extend({
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    ui.addNotification(null, E('p', _('导出功能开发中...')), 'info');
+                    exportServerConfig();
                 }
             }, _('导出服务器'));
 
@@ -219,7 +532,7 @@ return view.extend({
         o = s.taboption('basic', form.Flag, 'enabled', _('启用'));
         o.default = '1';
         o.editable = true;
-        o.width = '10%';
+        o.width = '8%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('别名'));
@@ -230,18 +543,18 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'local_port', _('TCP 监听端口'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '12%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('转发到 IP'));
         o.datatype = 'host';
         o.placeholder = '127.0.0.1';
         o.rmempty = false;
-        o.width = '20%';
+        o.width = '18%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('转发到端口'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '12%';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('仅 IPv4'),
@@ -309,7 +622,7 @@ return view.extend({
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    ui.addNotification(null, E('p', _('导入功能开发中...')), 'info');
+                    importClientConfig();
                 }
             }, _('导入客户端'));
 
@@ -321,7 +634,7 @@ return view.extend({
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    ui.addNotification(null, E('p', _('导出功能开发中...')), 'info');
+                    exportClientConfig();
                 }
             }, _('导出客户端'));
 
@@ -360,7 +673,7 @@ return view.extend({
         o = s.taboption('basic', form.Flag, 'enabled', _('启用'));
         o.default = '1';
         o.editable = true;
-        o.width = '10%';
+        o.width = '8%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('别名'));
@@ -376,12 +689,12 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'remote_port', _('服务器端口'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '12%';
 
-        o = s.taboption('basic', form.Value, 'local_port', _('本地 UDP 端口'));
+        o = s.taboption('basic', form.Value, 'local_port', _('本地端口'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '12%';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('本地 UDP 地址'),

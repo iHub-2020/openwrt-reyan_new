@@ -26,7 +26,7 @@ var callServiceList = rpc.declare({
 });
 
 return view.extend({
-    title: _('Phantun Status'),
+    title: _('TCP Tunnel Status'),
 
     pollInterval: 5,
     logPollFn: null,
@@ -265,7 +265,7 @@ return view.extend({
         var instanceCount = Object.keys(serviceStatus.instances).length;
 
         var container = E('div', { 'class': 'cbi-map' }, [
-            E('h2', {}, _('Phantun 状态')),
+            E('h2', {}, _('TCP 隧道状态')),
 
             // ==================== 服务状态 (简洁版) ====================
             E('div', { 'class': 'cbi-section' }, [
@@ -398,7 +398,6 @@ return view.extend({
                         'click': function () {
                             lastClearTime = new Date();
                             self.pollLogs();
-                            ui.addNotification(null, E('p', _('日志已清理,只显示此刻之后的新日志')), 'info');
                         }
                     }, _('清理日志')),
                     ' ',
@@ -432,10 +431,20 @@ return view.extend({
         requestAnimationFrame(function () {
             var logStatusEl = document.getElementById('log-status');
             if (logStatusEl) {
+                // 设置初始时间戳
+                var now = new Date();
+                var timeStr = now.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+                logStatusEl.textContent = 'Last updated: ' + timeStr;
+                logStatusEl.style.color = '#888';
+
+                // 启动轮询
                 self.logPollFn = L.bind(self.pollLogs, self);
                 poll.add(self.logPollFn, self.pollInterval);
-                logStatusEl.textContent = '▶ ' + _('自动刷新中');
-                logStatusEl.style.color = '#5cb85c';
             }
         });
 
@@ -448,6 +457,19 @@ return view.extend({
             var textarea = document.getElementById('syslog-textarea');
             if (textarea) {
                 textarea.value = logs.join('\n');
+            }
+
+            // 更新时间戳
+            var logStatusEl = document.getElementById('log-status');
+            if (logStatusEl) {
+                var now = new Date();
+                var timeStr = now.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+                logStatusEl.textContent = 'Last updated: ' + timeStr;
             }
         });
     },

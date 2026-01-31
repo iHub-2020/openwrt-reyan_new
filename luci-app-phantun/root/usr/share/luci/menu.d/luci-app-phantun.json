@@ -1,12 +1,14 @@
 {
 	"admin/services/phantun": {
-		"title": "Phantun",
+		"title": "TCP Tunnel",
 		"order": 60,
 		"action": {
 			"type": "firstchild"
 		},
 		"depends": {
-			"acl": ["luci-app-phantun"]
+			"acl": [
+				"luci-app-phantun"
+			]
 		}
 	},
 	"admin/services/phantun/config": {
