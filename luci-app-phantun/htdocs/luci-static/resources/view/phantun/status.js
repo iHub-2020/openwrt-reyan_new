@@ -52,7 +52,7 @@ return view.extend({
     getServiceStatus: function () {
         return Promise.all([
             L.resolveDefault(callServiceList('phantun'), {}),
-            fs.exec('/bin/sh', ['-c', 'pgrep -f phantun_server || pgrep -f phantun_client'])
+            L.resolveDefault(fs.exec('/bin/sh', ['-c', 'pgrep -f \"phantun_server|phantun_client\"']), {})
         ]).then(function (results) {
             var serviceList = results[0];
             var psOutput = results[1];
@@ -74,7 +74,7 @@ return view.extend({
                 }
             }
 
-            // Fallback: check if processes exist
+            // Fallback: check if processes exist (pgrep returns 0 if found, non-zero if not found)
             if (!isRunning && psOutput && psOutput.code === 0 && psOutput.stdout && psOutput.stdout.trim()) {
                 isRunning = true;
             }

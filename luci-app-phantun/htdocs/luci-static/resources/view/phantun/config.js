@@ -112,101 +112,105 @@ return view.extend({
         m.handleSave = null;  // Use default save behavior
         m.handleReset = null; // Disable default reset (we'll override it)
 
-        // Override render to bind reset button event
+        // ==================== Modify Reset Button After Render ====================
         var originalRender = m.render.bind(m);
         m.render = function () {
-            var node = originalRender();
+            var mapEl = originalRender();
 
-            // Find and override reset button after render
-            window.requestAnimationFrame(function () {
-                var resetBtn = document.querySelector('input[type="reset"]');
-                if (resetBtn) {
-                    // Remove default reset behavior
-                    resetBtn.type = 'button';
-                    resetBtn.className = 'cbi-button cbi-button-reset';
+            // Create the reset click handler function
+            var handleResetClick = function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
 
-                    // Add custom click handler
-                    resetBtn.addEventListener('click', function (ev) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        showResetConfirmation();
+                ui.showModal(_('Reset Configuration'), [
+                    E('p', {}, _('Are you sure you want to reset all TCP tunnel configurations?')),
+                    E('p', {}, _('This will:')),
+                    E('ul', {}, [
+                        E('li', {}, _('Clear all server and client configurations')),
+                        E('li', {}, _('Stop the phantun service')),
+                        E('li', {}, _('Reset general settings to defaults'))
+                    ]),
+                    E('div', { 'class': 'right' }, [
+                        E('button', {
+                            'class': 'cbi-button cbi-button-neutral',
+                            'click': ui.hideModal
+                        }, _('Cancel')),
+                        E('button', {
+                            'class': 'cbi-button cbi-button-negative',
+                            'click': function () {
+                                ui.hideModal();
+                                performReset();
+                            }
+                        }, _('Reset'))
+                    ])
+                ]);
+            };
+
+            // Function to perform the actual reset
+            var performReset = function () {
+                ui.showModal(_('Resetting Configuration'), [
+                    E('p', { 'class': 'spinning' }, _('Clearing all configurations...'))
+                ]);
+
+                // Stop service first
+                callInitAction('phantun', 'stop').then(function () {
+                    // Clear all server sections
+                    var serverSections = uci.sections('phantun', 'server');
+                    serverSections.forEach(function (section) {
+                        uci.remove('phantun', section['.name']);
                     });
-                }
-            });
 
-            return node;
-        };
+                    // Clear all client sections
+                    var clientSections = uci.sections('phantun', 'client');
+                    clientSections.forEach(function (section) {
+                        uci.remove('phantun', section['.name']);
+                    });
 
-        // Show reset confirmation dialog
-        function showResetConfirmation() {
-            ui.showModal(_('Reset Configuration'), [
-                E('p', {}, _('Are you sure you want to reset all TCP tunnel configurations?')),
-                E('p', {}, _('This will:')),
-                E('ul', {}, [
-                    E('li', {}, _('Clear all server and client instances')),
-                    E('li', {}, _('Stop the phantun service')),
-                    E('li', {}, _('Reset general settings to defaults'))
-                ]),
-                E('div', { 'class': 'right' }, [
-                    E('button', {
-                        'class': 'cbi-button cbi-button-neutral',
-                        'click': ui.hideModal
-                    }, _('Cancel')),
-                    ' ',
-                    E('button', {
-                        'class': 'cbi-button cbi-button-negative',
-                        'click': function () {
-                            ui.hideModal();
-                            performReset();
-                        }
-                    }, _('Reset'))
-                ])
-            ]);
-        }
+                    // Reset general section to defaults
+                    var generalSections = uci.sections('phantun', 'general');
+                    if (generalSections.length > 0) {
+                        var generalSection = generalSections[0]['.name'];
+                        uci.set('phantun', generalSection, 'enabled', '1');
+                        uci.set('phantun', generalSection, 'log_level', 'info');
+                    }
 
-        // Function to perform the actual reset
-        var performReset = function () {
-            ui.showModal(_('Resetting Configuration'), [
-                E('p', { 'class': 'spinning' }, _('Clearing all configurations...'))
-            ]);
-
-            // Stop service first
-            callInitAction('phantun', 'stop').then(function () {
-                // Clear all server sections
-                var serverSections = uci.sections('phantun', 'server');
-                serverSections.forEach(function (section) {
-                    uci.remove('phantun', section['.name']);
+                    // Save changes
+                    return uci.save();
+                }).then(function () {
+                    ui.hideModal();
+                    ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
+                    setTimeout(function () {
+                        window.location.reload();
+                    }, 1500);
+                }).catch(function (err) {
+                    ui.hideModal();
+                    ui.addNotification(null,
+                        E('p', _('Failed to reset configuration: ') + (err.message || err)),
+                        'error');
                 });
+            };
 
-                // Clear all client sections
-                var clientSections = uci.sections('phantun', 'client');
-                clientSections.forEach(function (section) {
-                    uci.remove('phantun', section['.name']);
-                });
+            // Function to apply button modifications
+            var applyButtonMods = function () {
+                var resetBtn = document.querySelector('.cbi-button-reset');
 
-                // Reset general section to defaults
-                var generalSections = uci.sections('phantun', 'general');
-                if (generalSections.length > 0) {
-                    var generalSection = generalSections[0]['.name'];
-                    uci.set('phantun', generalSection, 'enabled', '1');
-                    uci.set('phantun', generalSection, 'log_level', 'info');
-                } else {
-                    // Create general section if it doesn't exist
-                    var sid = uci.add('phantun', 'general');
-                    uci.set('phantun', sid, 'enabled', '1');
-                    uci.set('phantun', sid, 'log_level', 'info');
+                if (resetBtn) {
+                    // Force override onclick
+                    resetBtn.onclick = handleResetClick;
+
+                    // Remove color classes first
+                    resetBtn.classList.remove('cbi-button-positive', 'cbi-button-negative', 'cbi-button-neutral');
+
+                    // Set text and style for reset button
+                    resetBtn.textContent = '复位';
+                    resetBtn.classList.add('cbi-button-negative');
                 }
+            };
 
-                // Save changes
-                return uci.save();
-            }).then(function () {
-                ui.hideModal();
-                ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
-                setTimeout(function () { window.location.reload(); }, 1500);
-            }).catch(function (err) {
-                ui.hideModal();
-                ui.addNotification(null, E('p', _('Reset failed: ') + (err.message || err)), 'error');
-            });
+            // Apply modifications after a short delay to ensure DOM is ready
+            setTimeout(applyButtonMods, 100);
+
+            return mapEl;
         };
 
         // ==================== Import/Export Functions ====================
