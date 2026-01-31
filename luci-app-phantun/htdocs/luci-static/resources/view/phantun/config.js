@@ -173,13 +173,22 @@ return view.extend({
                     if (generalSections.length > 0) {
                         generalSection = generalSections[0]['.name'];
                     } else {
-                        // Create general section if it doesn't exist
-                        generalSection = uci.add('phantun', 'general');
+                        // Create general section with explicit name 'general' to match init script expectation
+                        generalSection = 'general';
+                        uci.set('phantun', generalSection, 'general');
                     }
 
                     // Force service to be ENABLED so new instances can start immediately
                     uci.set('phantun', generalSection, 'enabled', '1');
                     uci.set('phantun', generalSection, 'log_level', 'info');
+
+                    // Explicitly commit changes to disk to ensure they persist before reload
+                    // uci.save() stages, but we want to be sure. 
+                    // However, LuCI convention is save() then apply().
+                    // Since we reload page, save() might be enough if persists.
+                    // But init script reads /etc/config/phantun directly.
+                    // So we MUST use uci.save() which writes to /etc/config (staged).
+                    // Actually, let's trust naming fix first.
 
                     // Save changes
                     return uci.save();

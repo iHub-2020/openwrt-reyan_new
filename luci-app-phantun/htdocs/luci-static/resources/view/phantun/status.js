@@ -266,7 +266,17 @@ return view.extend({
 
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
-                // Check if line contains relevant IP range
+
+                // Super Robust Check: Look for 'phantun' comment tag (added by init script)
+                // This bypasses IP formatting issues (spaces, etc.) entirely
+                if (line.indexOf('phantun') !== -1 && line.indexOf('comment') !== -1) {
+                    activeRules = true;
+                    if (line.indexOf('MASQUERADE') !== -1) masqueradeFound = true;
+                    if (line.indexOf('DNAT') !== -1) dnatFound = true;
+                    continue;
+                }
+
+                // Legacy Check: Check if line contains relevant IP range
                 // Relaxed check: Just look for IP and rule type, allow missing -j if format differs
                 if (line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) {
                     if (line.indexOf('MASQUERADE') !== -1) {
