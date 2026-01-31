@@ -277,8 +277,9 @@ return view.extend({
                 }
 
                 // Legacy Check: Check if line contains relevant IP range
-                // Relaxed check: Just look for IP and rule type, allow missing -j if format differs
-                if (line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) {
+                // Fix: Use Regex to handle Spaces in logs (e.g. "192. 168.")
+                var ipRegex = /192\. ?168\. ?20[01]/; // Matches 192.168.200 or 201 with optional spaces
+                if (ipRegex.test(line)) {
                     if (line.indexOf('MASQUERADE') !== -1) {
                         masqueradeFound = true;
                         activeRules = true;

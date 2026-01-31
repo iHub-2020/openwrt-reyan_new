@@ -172,10 +172,19 @@ return view.extend({
 
                     if (generalSections.length > 0) {
                         generalSection = generalSections[0]['.name'];
+                        // Ensure it is named 'general' if it isn't (though usually typed section 'general' named 'settings')
+                        // But init script looks for section named 'general'.
+                        // If our existing section is named "settings", init script WON'T FIND IT.
+                        // So we MUST rename it to "general" if it exists but has wrong name.
+                        if (generalSection !== 'general') {
+                            uci.rename('phantun', generalSection, 'general');
+                            generalSection = 'general';
+                        }
                     } else {
-                        // Create general section with explicit name 'general' to match init script expectation
+                        // Create named section 'general'
+                        var sid = uci.add('phantun', 'general');
+                        uci.rename('phantun', sid, 'general');
                         generalSection = 'general';
-                        uci.set('phantun', generalSection, 'general');
                     }
 
                     // Force service to be ENABLED so new instances can start immediately
