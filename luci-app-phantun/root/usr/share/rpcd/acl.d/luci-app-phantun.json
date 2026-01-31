@@ -1,0 +1,47 @@
+{
+    "luci-app-phantun": {
+        "description": "Grant access to Phantun configuration",
+        "read": {
+            "uci": [
+                "phantun"
+            ],
+            "file": {
+                "/usr/bin/phantun_client": [
+                    "exec"
+                ],
+                "/usr/bin/phantun_server": [
+                    "exec"
+                ],
+                "/etc/config/phantun": [
+                    "read"
+                ]
+            },
+            "ubus": {
+                "service": [
+                    "list"
+                ]
+            }
+        },
+        "write": {
+            "uci": [
+                "phantun"
+            ],
+            "ubus": {
+                "service": [
+                    "list"
+                ],
+                "luci": [
+                    "setInitAction"
+                ]
+            },
+            "file": {
+                "/etc/config/phantun": [
+                    "write"
+                ],
+                "/etc/init.d/phantun": [
+                    "exec"
+                ]
+            }
+        }
+    }
+}
