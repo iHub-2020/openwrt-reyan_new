@@ -147,6 +147,12 @@ msgstr "重置"
 msgid "Logs cleared. Showing only new logs."
 msgstr "日志已清理。仅显示新日志。"
 
+msgid "Server address is required"
+msgstr "服务器地址为必填项"
+
+msgid "Please enter a real server address, not an example domain"
+msgstr "请输入真实的服务器地址,不要使用示例域名"
+
 # Form sections
 msgid "Basic Settings"
 msgstr "基础设置"
