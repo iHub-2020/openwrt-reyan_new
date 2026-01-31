@@ -258,29 +258,34 @@ return view.extend({
             var statusColor = '#f0ad4e';
             var ruleTypes = [];
 
-            // Check for phantun-related rules by IP ranges
-            var hasPhantunRules = ipv4Output.indexOf('192.168.200') !== -1 ||
-                ipv4Output.indexOf('192.168.201') !== -1 ||
-                ipv6Output.indexOf('fcc8') !== -1 ||
-                ipv6Output.indexOf('fcc9') !== -1;
+            // Strict check: parse output line by line
+            var lines = ipv4Output.split('\n');
+            var masqueradeFound = false;
+            var dnatFound = false;
+            var activeRules = false;
 
-            if (hasPhantunRules) {
-                // Detect rule types
-                if (ipv4Output.indexOf('MASQUERADE') !== -1 &&
-                    (ipv4Output.indexOf('192.168.200') !== -1 || ipv4Output.indexOf('192.168.201') !== -1)) {
-                    ruleTypes.push('MASQUERADE');
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                // Check if line contains relevant IP range AND is a rule (contains -A or -I, or implicitly from iptables-save format which doesn't always show -A for all lines but usually does, or starts with -A)
+                // iptables-save output: -A PREROUTING ...
+                if ((line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) && line.indexOf('-j') !== -1) {
+                    if (line.indexOf('MASQUERADE') !== -1) masqueradeFound = true;
+                    if (line.indexOf('DNAT') !== -1) dnatFound = true;
+                    activeRules = true;
                 }
-                if (ipv4Output.indexOf('DNAT') !== -1 &&
-                    (ipv4Output.indexOf('192.168.200') !== -1 || ipv4Output.indexOf('192.168.201') !== -1)) {
-                    ruleTypes.push('DNAT');
-                }
+            }
 
+            // Also accept if specific chain jump exists (though phantun usually uses built-in chains)
+            // If explicit active rules found
+            if (activeRules) {
+                if (masqueradeFound) ruleTypes.push('MASQUERADE');
+                if (dnatFound) ruleTypes.push('DNAT');
+
+                statusColor = '#5cb85c';
                 if (ruleTypes.length > 0) {
                     statusText = _('Active') + ' (' + ruleTypes.join(', ') + ')';
-                    statusColor = '#5cb85c';
                 } else {
                     statusText = _('Active (Rules Detected)');
-                    statusColor = '#5cb85c';
                 }
             }
 
@@ -568,7 +573,11 @@ return view.extend({
             // CRITICAL: Add status auto-refresh (not just logs)
             poll.add(function () {
                 return self.fetchStatusData().then(function (newData) {
-                    self.updateStatusView(container, newData);
+                    // Find the container element dynamically
+                    var statusContainer = document.querySelector('.cbi-map');
+                    if (statusContainer) {
+                        self.updateStatusView(statusContainer, newData);
+                    }
                 });
             }, 5);  // Refresh status every 5 seconds
         });
