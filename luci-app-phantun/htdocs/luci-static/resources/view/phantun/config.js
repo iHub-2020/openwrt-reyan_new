@@ -192,15 +192,12 @@ return view.extend({
                     uci.set('phantun', generalSection, 'log_level', 'info');
 
                     // Explicitly commit changes to disk to ensure they persist before reload
-                    // uci.save() stages, but we want to be sure. 
-                    // However, LuCI convention is save() then apply().
-                    // Since we reload page, save() might be enough if persists.
-                    // But init script reads /etc/config/phantun directly.
-                    // So we MUST use uci.save() which writes to /etc/config (staged).
-                    // Actually, let's trust naming fix first.
-
-                    // Save changes
-                    return uci.save();
+                    // uci.save() only stages changes in /tmp/.uci. 
+                    // Init script reads /etc/config/phantun directly, so we MUST commit.
+                    // This fixes the 'Cannot start after reset' bug.
+                    return uci.save().then(function () {
+                        return uci.commit('phantun');
+                    });
                 }).then(function () {
                     ui.hideModal();
                     ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');

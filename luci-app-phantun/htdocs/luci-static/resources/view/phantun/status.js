@@ -264,12 +264,24 @@ return view.extend({
             var dnatFound = false;
             var activeRules = false;
 
+            // Debugging: Log full iptables output to help user diagnose "No Rules" issue
+            if (lines.length > 0) {
+                console.log('Phantun Debug: iptables-save output (' + lines.length + ' lines):');
+                // console.log(lines.join('\n')); // Uncomment if needed, but might be too spammy. 
+                // Just log first few lines containing 'phantun'
+                lines.forEach(function (l) {
+                    if (l.indexOf('phantun') !== -1 || l.indexOf('192.168.20') !== -1) console.log('Iptables Match Candidate:', l);
+                });
+            } else {
+                console.warn('Phantun Debug: iptables-save returned EMPTY output!');
+            }
+
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
 
-                // Super Robust Check: Look for 'phantun' comment tag (added by init script)
-                // This bypasses IP formatting issues (spaces, etc.) entirely
-                if (line.indexOf('phantun') !== -1 && line.indexOf('comment') !== -1) {
+                // Super Robust Check: Look for 'phantun' string anywhere
+                // This covers comments, and handles cases where 'comment' keyword might be formatted differently
+                if (line.indexOf('phantun') !== -1) {
                     activeRules = true;
                     if (line.indexOf('MASQUERADE') !== -1) masqueradeFound = true;
                     if (line.indexOf('DNAT') !== -1) dnatFound = true;
