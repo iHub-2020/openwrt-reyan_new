@@ -678,17 +678,9 @@ return view.extend({
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
-        o.placeholder = '192.168.1.100';
+        o.placeholder = '10.10.10.1';
         o.rmempty = false;
         o.width = '15%';
-        o.validate = function (section_id, value) {
-            if (!value) return _('Server address is required');
-            // Reject example/placeholder domains
-            if (/example\.(com|net|org)|localhost|your-server/i.test(value)) {
-                return _('Please enter a real server address, not an example domain');
-            }
-            return true;
-        };
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
@@ -822,17 +814,9 @@ return view.extend({
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
-        o.placeholder = 'vpn.yourserver.com or 1.2.3.4';
+        o.placeholder = '10.10.10.1';
         o.rmempty = false;
         o.width = '17%';
-        o.validate = function (section_id, value) {
-            if (!value) return _('Server address is required');
-            // Reject example/placeholder domains
-            if (/example\.(com|net|org)|localhost|your-server|yourserver/i.test(value)) {
-                return _('Please enter a real server address, not an example domain');
-            }
-            return true;
-        };
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
