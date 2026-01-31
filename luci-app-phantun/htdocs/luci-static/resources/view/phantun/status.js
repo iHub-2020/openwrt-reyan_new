@@ -579,7 +579,10 @@ return view.extend({
             // Function logic strictly copied from udp2raw: use captured view/container directly
             poll.add(function () {
                 return self.fetchStatusData().then(function (newData) {
+                    console.log('Phantun: Polling status update...', newData);
                     self.updateStatusView(container, newData);
+                }).catch(function (err) {
+                    console.error('Phantun: Poll failed', err);
                 });
             }, 5);  // Refresh status every 5 seconds
         });

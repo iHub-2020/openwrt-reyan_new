@@ -80,15 +80,15 @@ setup_client_iptables() {
 	
 	# IPv4 MASQUERADE rule
 	if [ -n "$tun_peer" ]; then
-		iptables -t nat -C POSTROUTING -s "$tun_peer/32" -j MASQUERADE 2>/dev/null || \
-		iptables -t nat -A POSTROUTING -s "$tun_peer/32" -j MASQUERADE
+		iptables -t nat -C POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
+		iptables -t nat -A POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE
 		logger -t phantun -p daemon.info "Added IPv4 MASQUERADE rule for $tun_peer"
 	fi
 	
 	# IPv6 MASQUERADE rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ]; then
-		ip6tables -t nat -C POSTROUTING -s "$tun_peer6/128" -j MASQUERADE 2>/dev/null || \
-		ip6tables -t nat -A POSTROUTING -s "$tun_peer6/128" -j MASQUERADE
+		ip6tables -t nat -C POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
+		ip6tables -t nat -A POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE
 		logger -t phantun -p daemon.info "Added IPv6 MASQUERADE rule for $tun_peer6"
 	fi
 }
@@ -102,54 +102,61 @@ setup_server_iptables() {
 	
 	# IPv4 DNAT rule
 	if [ -n "$tun_peer" ] && [ -n "$local_port" ]; then
-		iptables -t nat -C PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null || \
-		iptables -t nat -A PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "$tun_peer:$local_port"
+		iptables -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null || \
+		iptables -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port"
 		logger -t phantun -p daemon.info "Added IPv4 DNAT rule: port $local_port -> $tun_peer:$local_port"
 	fi
 	
 	# IPv6 DNAT rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ] && [ -n "$local_port" ]; then
-		ip6tables -t nat -C PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null || \
-		ip6tables -t nat -A PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "[$tun_peer6]:$local_port"
+		ip6tables -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null || \
+		ip6tables -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port"
 		logger -t phantun -p daemon.info "Added IPv6 DNAT rule: port $local_port -> [$tun_peer6]:$local_port"
 	fi
 }
 
 # Cleanup iptables rules for client
 cleanup_client_iptables() {
-	local tun_peer="$1"
-	local tun_peer6="$2"
-	local ipv4_only="$3"
+	local section="$1"
+	local tun_peer tun_peer6 ipv4_only
+
+    # Load config to get IPs (Fix: previously treated section name as IP)
+    config_get tun_peer "$section" tun_peer "192.168.200.2"
+    config_get tun_peer6 "$section" tun_peer6 "fcc8::2"
+    config_get ipv4_only "$section" ipv4_only "0"
 	
-	# Remove IPv4 MASQUERADE rule
+	# Remove IPv4 MASQUERADE rule (Exact match with comment)
 	if [ -n "$tun_peer" ]; then
-		iptables -t nat -D POSTROUTING -s "$tun_peer/32" -j MASQUERADE 2>/dev/null
+		iptables -t nat -D POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv4 MASQUERADE rule for $tun_peer"
 	fi
 	
 	# Remove IPv6 MASQUERADE rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ]; then
-		ip6tables -t nat -D POSTROUTING -s "$tun_peer6/128" -j MASQUERADE 2>/dev/null
+		ip6tables -t nat -D POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv6 MASQUERADE rule for $tun_peer6"
 	fi
 }
 
 # Cleanup iptables rules for server
 cleanup_server_iptables() {
-	local local_port="$1"
-	local tun_peer="$2"
-	local tun_peer6="$3"
-	local ipv4_only="$4"
+	local section="$1"
+	local local_port tun_peer tun_peer6 ipv4_only
+
+    config_get local_port "$section" local_port
+    config_get tun_peer "$section" tun_peer "192.168.201.2"
+    config_get tun_peer6 "$section" tun_peer6 "fcc9::2"
+    config_get ipv4_only "$section" ipv4_only "0"
 	
 	# Remove IPv4 DNAT rule
 	if [ -n "$tun_peer" ] && [ -n "$local_port" ]; then
-		iptables -t nat -D PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null
+		iptables -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv4 DNAT rule: port $local_port -> $tun_peer:$local_port"
 	fi
 	
 	# Remove IPv6 DNAT rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ] && [ -n "$local_port" ]; then
-		ip6tables -t nat -D PREROUTING -p tcp --dport "$local_port" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null
+		ip6tables -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv6 DNAT rule: port $local_port -> [$tun_peer6]:$local_port"
 	fi
 }
@@ -312,11 +319,29 @@ stop_service() {
 	# Cleanup iptables rules
 	config_load phantun 2>/dev/null || return 0
 	
-	# Cleanup client rules
+	# Cleanup client rules (Try standard cleanup first)
 	config_foreach cleanup_client_iptables client
 	
-	# Cleanup server rules  
+	# Cleanup server rules (Try standard cleanup first)
 	config_foreach cleanup_server_iptables server
+    
+    # Brute Force Cleanup: Remove ANY remaining rules tagged with 'phantun' comment
+    # This handles case where config sections were deleted before stop was called
+    iptables-save -t nat | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
+        iptables -t nat $rule 2>/dev/null
+    done
+    
+    ip6tables-save -t nat | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
+        ip6tables -t nat $rule 2>/dev/null
+    done
+
+    # Fallback Cleanup for legacy rules (without comments) and default subnets
+    # This fixes the "Ghost Rules" issue for existing users
+    for ip in 192.168.200 192.168.201; do
+        iptables -t nat -S | grep "$ip" | grep -v "comment" | sed 's/-A/-D/' | while read rule; do
+            iptables -t nat $rule 2>/dev/null
+        done
+    done
 }
 
 service_triggers() {
