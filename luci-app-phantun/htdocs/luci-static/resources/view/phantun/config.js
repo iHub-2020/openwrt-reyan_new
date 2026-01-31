@@ -74,9 +74,9 @@ return view.extend({
 
         var m, s, o;
 
-        m = new form.Map('phantun', _('TCP 隧道配置'),
-            _('TCP 隧道 (Phantun) 是一个轻量级的 UDP 到 TCP 混淆工具。它创建 TUN 接口并需要正确的 iptables NAT 规则。' +
-                '配置客户端模式以连接到服务器,或配置服务器模式以接受客户端连接。'));
+        m = new form.Map('phantun', _('TCP Tunnel Configuration'),
+            _('TCP Tunnel (Phantun) is a lightweight UDP to TCP obfuscator. It creates TUN interfaces and requires proper iptables NAT rules. ' +
+                'Configure client mode to connect to a server, or server mode to accept client connections.'));
 
         // ==================== Import/Export Functions ====================
 
@@ -508,7 +508,7 @@ return view.extend({
 
         s.sectiontitle = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');
-            return alias ? (alias + ' (Server)') : _('新服务器');
+            return alias ? (alias + ' (Server)') : _('New Server');
         };
 
         s.handleAdd = function (ev) {
@@ -525,77 +525,77 @@ return view.extend({
             return this.renderMoreOptionsModal(section_id);
         };
 
-        s.tab('basic', _('基础设置'));
-        s.tab('advanced', _('高级设置'));
+        s.tab('basic', _('Basic Settings'));
+        s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns
-        o = s.taboption('basic', form.Flag, 'enabled', _('启用'));
+        o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
         o.width = '8%';
         o.rmempty = false;
 
-        o = s.taboption('basic', form.Value, 'alias', _('别名'));
+        o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
         o.modalonly = true;
 
-        o = s.taboption('basic', form.Value, 'local_port', _('TCP 监听端口'));
+        o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
         o.width = '12%';
 
-        o = s.taboption('basic', form.Value, 'remote_addr', _('转发到 IP'));
+        o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '127.0.0.1';
         o.rmempty = false;
         o.width = '18%';
 
-        o = s.taboption('basic', form.Value, 'remote_port', _('转发到端口'));
+        o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
         o.width = '12%';
 
         // Advanced Settings
-        o = s.taboption('advanced', form.Flag, 'ipv4_only', _('仅 IPv4'),
-            _('仅使用 IPv4（不分配 IPv6 地址到 TUN 接口）。'));
+        o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
+            _('Only use IPv4. Disables IPv6 addresses on TUN interface.'));
         o.default = '0';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_name', _('TUN 接口名称'),
-            _('TUN 接口自定义名称。留空则自动分配（tun0、tun1 等）。'));
+        o = s.taboption('advanced', form.Value, 'tun_name', _('TUN Interface Name'),
+            _('Custom name for TUN interface. Leave empty for auto-assign (tun0, tun1, etc).'));
         o.placeholder = 'tun0';
         o.optional = true;
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_local', _('TUN 本地 IPv4'),
-            _('本地系统的 TUN 接口 IPv4 地址（系统侧）。默认 192.168.201.1。'));
+        o = s.taboption('advanced', form.Value, 'tun_local', _('TUN Local IPv4'),
+            _('IPv4 address for OS side of TUN interface. Default 192.168.201.1.'));
         o.datatype = 'ip4addr';
         o.default = '192.168.201.1';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_peer', _('TUN 对端 IPv4'),
-            _('Phantun 服务端的 TUN 接口 IPv4 地址（程序侧）。系统会自动添加 DNAT 规则，将 TCP 流量转发到此地址。默认 192.168.201.2。'));
+        o = s.taboption('advanced', form.Value, 'tun_peer', _('TUN Peer IPv4'),
+            _('IPv4 address for Phantun side of TUN interface. DNAT rules will redirect to this IP. Default 192.168.201.2.'));
         o.datatype = 'ip4addr';
         o.default = '192.168.201.2';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_local6', _('TUN 本地 IPv6'),
-            _('本地系统的 TUN 接口 IPv6 地址（系统侧）。默认 fcc9::1。'));
+        o = s.taboption('advanced', form.Value, 'tun_local6', _('TUN Local IPv6'),
+            _('IPv6 address for OS side of TUN interface. Default fcc9::1.'));
         o.datatype = 'ip6addr';
         o.default = 'fcc9::1';
         o.depends('ipv4_only', '0');
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_peer6', _('TUN 对端 IPv6'),
-            _('Phantun 服务端的 TUN 接口 IPv6 地址（程序侧）。默认 fcc9::2。'));
+        o = s.taboption('advanced', form.Value, 'tun_peer6', _('TUN Peer IPv6'),
+            _('IPv6 address for Phantun side of TUN interface. Default fcc9::2.'));
         o.datatype = 'ip6addr';
         o.default = 'fcc9::2';
         o.depends('ipv4_only', '0');
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'handshake_packet', _('握手数据包文件'),
-            _('自定义握手包文件路径（高级功能，一般无需设置）。用于在 TCP 连接建立后发送特定数据包。'));
+        o = s.taboption('advanced', form.Value, 'handshake_packet', _('Handshake Packet File'),
+            _('Path to file containing custom handshake packet to send after TCP connection. Advanced feature.'));
         o.optional = true;
         o.modalonly = true;
 
@@ -650,7 +650,7 @@ return view.extend({
 
         s.sectiontitle = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');
-            return alias ? (alias + ' (Client)') : _('新客户端');
+            return alias ? (alias + ' (Client)') : _('New Client');
         };
 
         s.handleAdd = function (ev) {
@@ -666,83 +666,83 @@ return view.extend({
             return this.renderMoreOptionsModal(section_id);
         };
 
-        s.tab('basic', _('基础设置'));
-        s.tab('advanced', _('高级设置'));
+        s.tab('basic', _('Basic Settings'));
+        s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns
-        o = s.taboption('basic', form.Flag, 'enabled', _('启用'));
+        o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
         o.width = '8%';
         o.rmempty = false;
 
-        o = s.taboption('basic', form.Value, 'alias', _('别名'));
+        o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyClient';
         o.rmempty = true;
         o.modalonly = true;
 
-        o = s.taboption('basic', form.Value, 'remote_addr', _('服务器地址'));
+        o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
         o.rmempty = false;
         o.width = '20%';
 
-        o = s.taboption('basic', form.Value, 'remote_port', _('服务器端口'));
+        o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
         o.rmempty = false;
         o.width = '12%';
 
-        o = s.taboption('basic', form.Value, 'local_port', _('本地端口'));
+        o = s.taboption('basic', form.Value, 'local_port', _('Local Port'));
         o.datatype = 'port';
         o.rmempty = false;
         o.width = '12%';
 
         // Modal Only Options - Basic
-        o = s.taboption('basic', form.Value, 'local_addr', _('本地 UDP 地址'),
-            _('绑定的本地 IP 地址，用于接收 UDP 数据包。通常使用 127.0.0.1。'));
+        o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),
+            _('IP address to bind for incoming UDP packets. Use 127.0.0.1 for WireGuard/OpenVPN.'));
         o.datatype = 'ipaddr';
         o.default = '127.0.0.1';
         o.modalonly = true;
 
         // Advanced Settings
-        o = s.taboption('advanced', form.Flag, 'ipv4_only', _('仅 IPv4'),
-            _('仅使用 IPv4（不分配 IPv6 地址到 TUN 接口）。'));
+        o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
+            _('Only use IPv4. Disables IPv6 addresses on TUN interface.'));
         o.default = '0';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_name', _('TUN 接口名称'),
-            _('TUN 接口自定义名称。留空则自动分配（tun0、tun1 等）。'));
+        o = s.taboption('advanced', form.Value, 'tun_name', _('TUN Interface Name'),
+            _('Custom name for TUN interface. Leave empty for auto-assign (tun0, tun1, etc).'));
         o.placeholder = 'tun0';
         o.optional = true;
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_local', _('TUN 本地 IPv4'),
-            _('本地系统的 TUN 接口 IPv4 地址（系统侧）。默认 192.168.200.1。'));
+        o = s.taboption('advanced', form.Value, 'tun_local', _('TUN Local IPv4'),
+            _('IPv4 address for OS side of TUN interface. Default 192.168.200.1.'));
         o.datatype = 'ip4addr';
         o.default = '192.168.200.1';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_peer', _('TUN 对端 IPv4'),
-            _('Phantun 客户端的 TUN 接口 IPv4 地址（程序侧）。系统会自动为此地址添加 MASQUERADE 规则实现 NAT 转发。默认 192.168.200.2。'));
+        o = s.taboption('advanced', form.Value, 'tun_peer', _('TUN Peer IPv4'),
+            _('IPv4 address for Phantun side of TUN interface. MASQUERADE rules will be added for this IP. Default 192.168.200.2.'));
         o.datatype = 'ip4addr';
         o.default = '192.168.200.2';
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_local6', _('TUN 本地 IPv6'),
-            _('本地系统的 TUN 接口 IPv6 地址（系统侧）。默认 fcc8::1。'));
+        o = s.taboption('advanced', form.Value, 'tun_local6', _('TUN Local IPv6'),
+            _('IPv6 address for OS side of TUN interface. Default fcc8::1.'));
         o.datatype = 'ip6addr';
         o.default = 'fcc8::1';
         o.depends('ipv4_only', '0');
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'tun_peer6', _('TUN 对端 IPv6'),
-            _('Phantun 客户端的 TUN 接口 IPv6 地址（程序侧）。默认 fcc8::2。'));
+        o = s.taboption('advanced', form.Value, 'tun_peer6', _('TUN Peer IPv6'),
+            _('IPv6 address for Phantun side of TUN interface. Default fcc8::2.'));
         o.datatype = 'ip6addr';
         o.default = 'fcc8::2';
         o.depends('ipv4_only', '0');
         o.modalonly = true;
 
-        o = s.taboption('advanced', form.Value, 'handshake_packet', _('握手数据包文件'),
-            _('自定义握手包文件路径（高级功能，一般无需设置）。用于在 TCP 连接建立后发送特定数据包。'));
+        o = s.taboption('advanced', form.Value, 'handshake_packet', _('Handshake Packet File'),
+            _('Path to file containing custom handshake packet to send after TCP connection. Advanced feature.'));
         o.optional = true;
         o.modalonly = true;
 
