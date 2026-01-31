@@ -112,90 +112,84 @@ return view.extend({
         m.handleSave = null;  // Use default save behavior
 
         // Custom reset handler - clears all instances and resets to defaults
-        var originalRender = m.render.bind(m);
-        m.render = function () {
-            var mapEl = originalRender();
-
-            // Override reset button click handler after render
-            requestAnimationFrame(function () {
-                var resetBtn = mapEl.querySelector('.cbi-button-reset');
-                if (resetBtn) {
-                    resetBtn.addEventListener('click', function (ev) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-
-                        ui.showModal(_('Reset Configuration'), [
-                            E('p', {}, _('Are you sure you want to reset all TCP tunnel configurations?')),
-                            E('p', {}, _('This will:')),
-                            E('ul', {}, [
-                                E('li', {}, _('Clear all server and client instances')),
-                                E('li', {}, _('Stop the phantun service')),
-                                E('li', {}, _('Reset general settings to defaults'))
-                            ]),
-                            E('div', { 'class': 'right' }, [
-                                E('button', {
-                                    'class': 'cbi-button cbi-button-neutral',
-                                    'click': ui.hideModal
-                                }, _('Cancel')),
-                                ' ',
-                                E('button', {
-                                    'class': 'cbi-button cbi-button-negative',
-                                    'click': function () {
-                                        ui.hideModal();
-                                        performReset();
-                                    }
-                                }, _('Reset'))
-                            ])
-                        ]);
-                    });
-                }
+        m.handleReset = function (ev) {
+            var self = this;
+            return new Promise(function (resolve, reject) {
+                ui.showModal(_('Reset Configuration'), [
+                    E('p', {}, _('Are you sure you want to reset all TCP tunnel configurations?')),
+                    E('p', {}, _('This will:')),
+                    E('ul', {}, [
+                        E('li', {}, _('Clear all server and client instances')),
+                        E('li', {}, _('Stop the phantun service')),
+                        E('li', {}, _('Reset general settings to defaults'))
+                    ]),
+                    E('div', { 'class': 'right' }, [
+                        E('button', {
+                            'class': 'cbi-button cbi-button-neutral',
+                            'click': function () {
+                                ui.hideModal();
+                                reject(new Error('cancelled'));
+                            }
+                        }, _('Cancel')),
+                        ' ',
+                        E('button', {
+                            'class': 'cbi-button cbi-button-negative',
+                            'click': function () {
+                                ui.hideModal();
+                                performReset().then(resolve).catch(reject);
+                            }
+                        }, _('Reset'))
+                    ])
+                ]);
             });
-
-            return mapEl;
         };
 
         // Function to perform the actual reset
         var performReset = function () {
-            ui.showModal(_('Resetting Configuration'), [
-                E('p', { 'class': 'spinning' }, _('Clearing all configurations...'))
-            ]);
+            return new Promise(function (resolve, reject) {
+                ui.showModal(_('Resetting Configuration'), [
+                    E('p', { 'class': 'spinning' }, _('Clearing all configurations...'))
+                ]);
 
-            // Stop service first
-            callInitAction('phantun', 'stop').then(function () {
-                // Clear all server sections
-                var serverSections = uci.sections('phantun', 'server');
-                serverSections.forEach(function (section) {
-                    uci.remove('phantun', section['.name']);
+                // Stop service first
+                callInitAction('phantun', 'stop').then(function () {
+                    // Clear all server sections
+                    var serverSections = uci.sections('phantun', 'server');
+                    serverSections.forEach(function (section) {
+                        uci.remove('phantun', section['.name']);
+                    });
+
+                    // Clear all client sections
+                    var clientSections = uci.sections('phantun', 'client');
+                    clientSections.forEach(function (section) {
+                        uci.remove('phantun', section['.name']);
+                    });
+
+                    // Reset general section to defaults
+                    var generalSections = uci.sections('phantun', 'general');
+                    if (generalSections.length > 0) {
+                        var generalSection = generalSections[0]['.name'];
+                        uci.set('phantun', generalSection, 'enabled', '1');
+                        uci.set('phantun', generalSection, 'log_level', 'info');
+                    } else {
+                        // Create general section if it doesn't exist
+                        var sid = uci.add('phantun', 'general');
+                        uci.set('phantun', sid, 'enabled', '1');
+                        uci.set('phantun', sid, 'log_level', 'info');
+                    }
+
+                    // Save changes
+                    return uci.save();
+                }).then(function () {
+                    ui.hideModal();
+                    ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                    resolve();
+                }).catch(function (err) {
+                    ui.hideModal();
+                    ui.addNotification(null, E('p', _('Reset failed: ') + (err.message || err)), 'error');
+                    reject(err);
                 });
-
-                // Clear all client sections
-                var clientSections = uci.sections('phantun', 'client');
-                clientSections.forEach(function (section) {
-                    uci.remove('phantun', section['.name']);
-                });
-
-                // Reset general section to defaults
-                var generalSections = uci.sections('phantun', 'general');
-                if (generalSections.length > 0) {
-                    var generalSection = generalSections[0]['.name'];
-                    uci.set('phantun', generalSection, 'enabled', '1');
-                    uci.set('phantun', generalSection, 'log_level', 'info');
-                } else {
-                    // Create general section if it doesn't exist
-                    var sid = uci.add('phantun', 'general');
-                    uci.set('phantun', sid, 'enabled', '1');
-                    uci.set('phantun', sid, 'log_level', 'info');
-                }
-
-                // Save changes
-                return uci.save();
-            }).then(function () {
-                ui.hideModal();
-                ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
-                setTimeout(function () { window.location.reload(); }, 1500);
-            }).catch(function (err) {
-                ui.hideModal();
-                ui.addNotification(null, E('p', _('Reset failed: ') + (err.message || err)), 'error');
             });
         };
 

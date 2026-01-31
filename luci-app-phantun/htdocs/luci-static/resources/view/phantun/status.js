@@ -342,7 +342,7 @@ return view.extend({
                     ])
                 ].concat(
                     tunnels.length > 0 ? tunnels.map(function (t) {
-                        var instanceKey = t.mode + '.' + t.id;
+                        var instanceKey = t.mode + '_' + t.id;  // Match init script format: client_cfg123 or server_cfg456
                         var instance = serviceStatus.instances[instanceKey];
                         var isActive = instance && instance.pid;
                         var rowColor = t.disabled ? '#888' : (isActive ? '#5cb85c' : '#d9534f');

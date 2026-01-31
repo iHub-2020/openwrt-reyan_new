@@ -4,11 +4,24 @@
 #
 # UCI defaults script for luci-app-phantun
 #
-# Version: 1.0.0
+# Version: 1.0.1
 # Last Updated: 2026-01-31
 #
 # 注意：配置文件的初始化已移交由 phantun 后端包处理。
 # 此脚本仅负责 LuCI 相关的环境刷新。
+
+# Set default configuration if not exists (prevent auto-start)
+if ! uci -q get phantun.general >/dev/null 2>&1; then
+    uci -q batch <<-EOF >/dev/null
+	set phantun.general=general
+	set phantun.general.enabled='0'
+	set phantun.general.log_level='info'
+	commit phantun
+EOF
+fi
+
+# Ensure service is stopped on first install
+/etc/init.d/phantun stop 2>/dev/null || true
 
 # 重启 rpcd 使 ACL 生效
 if [ -x /etc/init.d/rpcd ]; then
