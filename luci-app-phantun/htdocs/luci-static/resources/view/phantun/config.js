@@ -425,13 +425,13 @@ return view.extend({
             ]),
             // Important Information
             E('div', { 'class': 'alert-message warning', 'style': 'margin-bottom: 20px; background-color: #d4a017;' }, [
-                E('h4', { 'style': 'margin: 0 0 10px 0;' }, '⚠️ ' + _('重要安全信息')),
+                E('h4', { 'style': 'margin: 0 0 10px 0;' }, '⚠️ ' + _('Important Safety Information')),
                 E('ul', { 'style': 'margin: 0; padding-left: 20px;' }, [
-                    E('li', {}, _('Phantun 创建 TUN 接口并使用 FakeTCP 混淆 UDP 流量。')),
-                    E('li', {}, _('客户端模式需要 MASQUERADE iptables 规则（自动添加）。')),
-                    E('li', {}, _('服务器模式需要 DNAT iptables 规则（自动添加）。')),
-                    E('li', {}, _('无加密 - Phantun 专注于纯混淆以实现最大性能。')),
-                    E('li', {}, _('MTU 开销仅为 12 字节（TCP 头 - UDP 头）。'))
+                    E('li', {}, _('Phantun creates TUN interfaces and uses FakeTCP to obfuscate UDP traffic.')),
+                    E('li', {}, _('Client mode requires MASQUERADE iptables rules (automatically added).')),
+                    E('li', {}, _('Server mode requires DNAT iptables rules (automatically added).')),
+                    E('li', {}, _('No encryption - Phantun focuses on pure obfuscation for maximum performance.')),
+                    E('li', {}, _('MTU overhead is only 12 bytes (TCP header - UDP header).'))
                 ])
             ])
         ]);
@@ -459,14 +459,14 @@ return view.extend({
 
 
         // ==================== Server Instances ====================
-        s = m.section(form.GridSection, 'server', _('服务器端实例'),
-            _('<b>服务器模式:</b> OpenWrt 监听来自 Phantun 客户端的 TCP 连接并转发到本地 UDP 服务。<br/>' +
-                '流量流向: 远程 Phantun 客户端 → [TCP 混淆] → Phantun 服务器 → 本地 UDP 服务。'));
+        s = m.section(form.GridSection, 'server', _('Server Instances'),
+            _('<b>Server Mode:</b> OpenWrt listens for TCP connections from Phantun clients and forwards to local UDP service.<br/>' +
+                'Traffic Flow: Remote Phantun Client → [TCP Obfuscated] → Phantun Server → Local UDP Service.'));
         s.anonymous = false;
         s.addremove = true;
         s.sortable = true;
         s.nodescriptions = true;
-        s.addbtntitle = _('添加服务器');
+        s.addbtntitle = _('Add Server');
 
         // Override renderSectionAdd to add import/export buttons for servers
         s.renderSectionAdd = function (extra_class) {
@@ -482,7 +482,7 @@ return view.extend({
                     ev.stopPropagation();
                     importServerConfig();
                 }
-            }, _('导入服务器'));
+            }, _('Import Servers'));
 
             // Create export button (styled like delete button)
             var exportBtn = E('button', {
@@ -494,7 +494,7 @@ return view.extend({
                     ev.stopPropagation();
                     exportServerConfig();
                 }
-            }, _('导出服务器'));
+            }, _('Export Servers'));
 
             // Insert buttons directly into the existing button container
             var addBtn = el.querySelector('.cbi-button-add');
@@ -601,14 +601,14 @@ return view.extend({
 
 
         // ==================== Client Instances ====================
-        s = m.section(form.GridSection, 'client', _('客户端实例'),
-            _('<b>客户端模式:</b> OpenWrt 在本地监听 UDP 并连接到远程 Phantun 服务器。<br/>' +
-                '流量流向: 本地 UDP 应用 → Phantun 客户端 → [TCP 混淆] → 远程 Phantun 服务器 → 远程 UDP 服务。'));
+        s = m.section(form.GridSection, 'client', _('Client Instances'),
+            _('<b>Client Mode:</b> OpenWrt listens for UDP locally and connects to a remote Phantun server.<br/>' +
+                'Traffic Flow: Local UDP App → Phantun Client → [TCP Obfuscated] → Remote Phantun Server → Remote UDP Service.'));
         s.anonymous = false;
         s.addremove = true;
         s.sortable = true;
         s.nodescriptions = true;
-        s.addbtntitle = _('添加客户端');
+        s.addbtntitle = _('Add Client');
 
         // Override renderSectionAdd to add import/export buttons for clients
         s.renderSectionAdd = function (extra_class) {
@@ -624,7 +624,7 @@ return view.extend({
                     ev.stopPropagation();
                     importClientConfig();
                 }
-            }, _('导入客户端'));
+            }, _('Import Clients'));
 
             // Create export button
             var exportBtn = E('button', {
@@ -636,7 +636,7 @@ return view.extend({
                     ev.stopPropagation();
                     exportClientConfig();
                 }
-            }, _('导出客户端'));
+            }, _('Export Clients'));
 
             // Insert buttons directly into the existing button container
             var addBtn = el.querySelector('.cbi-button-add');

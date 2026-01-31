@@ -112,7 +112,7 @@ return view.extend({
             if (!logContent) return [];
             var lines = logContent.trim().split('\n');
 
-            // 如果点击过清理，只显示之后的日志
+            // If clear was clicked, only show logs after that time
             if (lastClearTime) {
                 lines = lines.filter(function (line) {
                     var match = line.match(/(\w{3}\s+\w{3}\s+\d+\s+\d+:\d+:\d+\s+\d{4})/);
@@ -123,8 +123,8 @@ return view.extend({
                     return false;
                 });
 
-                // 在过滤后的日志开头添加高亮的清理标记
-                var clearMarker = '=== 日志已清理 (' + lastClearTime.toLocaleString() + ') ===';
+                // Add highlighted clear marker at the beginning of filtered logs
+                var clearMarker = '=== Logs Cleared (' + lastClearTime.toLocaleString() + ') ===';
                 lines.unshift(clearMarker);
             }
 
@@ -133,7 +133,7 @@ return view.extend({
     },
 
     /**
-     * 计算二进制文件的MD5值
+     * Calculate MD5 hash of binary files
      */
     getMD5: function () {
         return fs.exec('/bin/sh', ['-c', 'md5sum /usr/bin/phantun_client /usr/bin/phantun_server 2>/dev/null || echo "NOTFOUND"'])
@@ -161,7 +161,7 @@ return view.extend({
     },
 
     /**
-     * 检查 iptables 规则
+     * Check iptables rules
      */
     checkIptablesRules: function () {
         return Promise.all([
@@ -196,7 +196,7 @@ return view.extend({
     },
 
     /**
-     * 检查 TUN 接口
+     * Check TUN interfaces
      */
     checkTunInterfaces: function () {
         return fs.exec('/sbin/ip', ['addr', 'show']).then(function (res) {
@@ -206,7 +206,7 @@ return view.extend({
             var currentIface = null;
 
             lines.forEach(function (line) {
-                // 匹配接口名称行
+                // Match interface name line
                 var ifaceMatch = line.match(/^\d+:\s+(tun\d+):/);
                 if (ifaceMatch) {
                     currentIface = {
@@ -218,14 +218,14 @@ return view.extend({
                     tunInterfaces.push(currentIface);
                 }
 
-                // 匹配 IPv4 地址
+                // Match IPv4 address
                 if (currentIface) {
                     var ipv4Match = line.match(/inet\s+([\d.]+\/\d+)/);
                     if (ipv4Match) {
                         currentIface.ipv4.push(ipv4Match[1]);
                     }
 
-                    // 匹配 IPv6 地址
+                    // Match IPv6 address
                     var ipv6Match = line.match(/inet6\s+([a-f0-9:]+\/\d+)/i);
                     if (ipv6Match) {
                         currentIface.ipv6.push(ipv6Match[1]);
@@ -265,9 +265,9 @@ return view.extend({
         var instanceCount = Object.keys(serviceStatus.instances).length;
 
         var container = E('div', { 'class': 'cbi-map' }, [
-            E('h2', {}, _('TCP 隧道状态')),
+            E('h2', {}, _('TCP Tunnel Status')),
 
-            // ==================== 服务状态 (简洁版) ====================
+            // ==================== Service Status (Compact) ====================
             E('div', { 'class': 'cbi-section' }, [
                 E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
                     E('div', { 'style': 'width: 150px; font-weight: bold;' }, _('Service Status:')),
@@ -276,7 +276,7 @@ return view.extend({
                 ])
             ]),
 
-            // ==================== 隧道状态表 ====================
+            // ==================== Tunnel Status Table ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', {}, _('Tunnel Status')),
                 E('table', { 'class': 'table cbi-section-table' }, [
@@ -314,7 +314,7 @@ return view.extend({
                 ])
             ]),
 
-            // ==================== 系统诊断 (简洁版) ====================
+            // ==================== System Diagnostics (Compact) ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', {}, _('System Diagnostics')),
                 E('div', { 'style': 'display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 10px 0;' }, [
@@ -348,7 +348,7 @@ return view.extend({
                 ])
             ]),
 
-            // ==================== 最近日志 ====================
+            // ==================== Recent Logs ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', { 'style': 'display:flex; justify-content:space-between; align-items:center;' }, [
                     _('Recent Logs'),
@@ -427,11 +427,11 @@ return view.extend({
             ])
         ])
 
-        // 启动日志自动刷新（延迟到 DOM 渲染完成后）
+        // Start log auto-refresh (delayed until DOM rendering is complete)
         requestAnimationFrame(function () {
             var logStatusEl = document.getElementById('log-status');
             if (logStatusEl) {
-                // 设置初始时间戳
+                // Set initial timestamp
                 var now = new Date();
                 var timeStr = now.toLocaleTimeString('en-US', {
                     hour: 'numeric',
@@ -442,7 +442,7 @@ return view.extend({
                 logStatusEl.textContent = 'Last updated: ' + timeStr;
                 logStatusEl.style.color = '#888';
 
-                // 启动轮询
+                // Start polling
                 self.logPollFn = L.bind(self.pollLogs, self);
                 poll.add(self.logPollFn, self.pollInterval);
             }
@@ -459,7 +459,7 @@ return view.extend({
                 textarea.value = logs.join('\n');
             }
 
-            // 更新时间戳
+            // Update timestamp
             var logStatusEl = document.getElementById('log-status');
             if (logStatusEl) {
                 var now = new Date();
