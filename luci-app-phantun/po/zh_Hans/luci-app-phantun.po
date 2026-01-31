@@ -110,6 +110,40 @@ msgstr "配置应用成功"
 msgid "Configuration saved but failed to control service: "
 msgstr "配置已保存但无法控制服务: "
 
+# Reset messages
+msgid "Reset Configuration"
+msgstr "重置配置"
+
+msgid "Are you sure you want to reset all TCP tunnel configurations?"
+msgstr "确定要重置所有 TCP 隧道配置吗？"
+
+msgid "This will:"
+msgstr "这将会："
+
+msgid "Clear all server and client instances"
+msgstr "清除所有服务器和客户端实例"
+
+msgid "Stop the phantun service"
+msgstr "停止 phantun 服务"
+
+msgid "Reset general settings to defaults"
+msgstr "将常规设置重置为默认值"
+
+msgid "Resetting Configuration"
+msgstr "正在重置配置"
+
+msgid "Clearing all configurations..."
+msgstr "正在清除所有配置..."
+
+msgid "Configuration reset successfully"
+msgstr "配置重置成功"
+
+msgid "Reset failed: "
+msgstr "重置失败: "
+
+msgid "Reset"
+msgstr "重置"
+
 # Form sections
 msgid "Basic Settings"
 msgstr "基础设置"
