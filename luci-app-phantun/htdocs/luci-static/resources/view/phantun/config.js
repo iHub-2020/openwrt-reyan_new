@@ -77,6 +77,10 @@ return view.extend({
         m = new form.Map('phantun', _('TCP Tunnel Configuration'),
             _('TCP Tunnel (Phantun) is a lightweight UDP to TCP obfuscator. It creates TUN interfaces and requires proper iptables NAT rules. ' +
                 'Configure client mode to connect to a server, or server mode to accept client connections.'));
+        
+        m.handleSaveApply = null;
+        m.handleSave = null;
+        m.handleReset = null;
 
         // ==================== Import/Export Functions ====================
 
@@ -532,7 +536,7 @@ return view.extend({
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '8%';
+        o.width = '13%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
@@ -543,18 +547,18 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '12%';
+        o.width = '17%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '127.0.0.1';
         o.rmempty = false;
-        o.width = '18%';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '12%';
+        o.width = '10%';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
@@ -673,7 +677,7 @@ return view.extend({
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '8%';
+        o.width = '13%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
@@ -684,17 +688,17 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
         o.rmempty = false;
-        o.width = '20%';
+        o.width = '17%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '12%';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('Local Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '12%';
+        o.width = '10%';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),

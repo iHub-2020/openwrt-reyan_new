@@ -36,6 +36,18 @@ return view.extend({
         return String(str).replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').trim();
     },
 
+    getLogColor: function (line) {
+        var lowerLine = line.toLowerCase();
+        if (lowerLine.indexOf('err') !== -1 || lowerLine.indexOf('error') !== -1 ||
+            lowerLine.indexOf('fail') !== -1 || lowerLine.indexOf('panic') !== -1) {
+            return '#ff6b6b'; // Red for errors
+        }
+        if (lowerLine.indexOf('warn') !== -1 || lowerLine.indexOf('warning') !== -1) {
+            return '#ffd93d'; // Yellow for warnings
+        }
+        return '#ddd'; // Default color for info
+    },
+
     getServiceStatus: function () {
         return L.resolveDefault(callServiceList('phantun'), {}).then(function (res) {
             var instances = {};
@@ -165,32 +177,49 @@ return view.extend({
      */
     checkIptablesRules: function () {
         return Promise.all([
-            fs.exec('/usr/sbin/iptables', ['-t', 'nat', '-L', '-n', '-v']),
-            fs.exec('/usr/sbin/ip6tables', ['-t', 'nat', '-L', '-n', '-v'])
+            fs.exec('/usr/sbin/iptables-save'),
+            fs.exec('/usr/sbin/ip6tables-save')
         ]).then(function (results) {
             var ipv4Output = results[0].stdout || '';
             var ipv6Output = results[1].stdout || '';
 
-            var ipv4Rules = ipv4Output.split('\n').filter(function (line) {
-                return line.indexOf('phantun') !== -1 ||
-                    line.indexOf('192.168.200') !== -1 ||
-                    line.indexOf('192.168.201') !== -1;
-            });
+            var statusText = _('No rules detected');
+            var statusColor = '#f0ad4e';
+            var chainNames = [];
 
-            var ipv6Rules = ipv6Output.split('\n').filter(function (line) {
-                return line.indexOf('phantun') !== -1 ||
-                    line.indexOf('fcc8') !== -1 ||
-                    line.indexOf('fcc9') !== -1;
-            });
+            // Detect phantun chains
+            var chainMatches = ipv4Output.match(/:phantun[^\s]*/g);
+            if (chainMatches && chainMatches.length > 0) {
+                chainNames = chainMatches.map(function (s) { return s.substring(1); });
+                statusText = _('Active') + ' (' + chainNames.join(', ') + ')';
+                statusColor = '#5cb85c';
+            } else if (ipv4Output.indexOf('phantun') !== -1) {
+                // Check for MASQUERADE/DNAT rules
+                var ruleTypes = [];
+                if (ipv4Output.indexOf('MASQUERADE') !== -1) ruleTypes.push('MASQUERADE');
+                if (ipv4Output.indexOf('DNAT') !== -1) ruleTypes.push('DNAT');
+
+                if (ruleTypes.length > 0) {
+                    statusText = _('Active') + ' (' + ruleTypes.join(', ') + ')';
+                    statusColor = '#5cb85c';
+                } else {
+                    statusText = _('Active (Rules Detected)');
+                    statusColor = '#5cb85c';
+                }
+            }
 
             return {
-                ipv4: ipv4Rules.length > 0 ? ipv4Rules : ['No Phantun-related rules found'],
-                ipv6: ipv6Rules.length > 0 ? ipv6Rules : ['No Phantun-related rules found']
+                text: statusText,
+                color: statusColor,
+                ipv4: ipv4Output.split('\n').filter(function (l) { return l.indexOf('phantun') !== -1; }),
+                ipv6: ipv6Output.split('\n').filter(function (l) { return l.indexOf('phantun') !== -1; })
             };
         }).catch(function (err) {
             return {
-                ipv4: ['Error: ' + (err.message || 'Failed to check iptables')],
-                ipv6: ['Error: ' + (err.message || 'Failed to check ip6tables')]
+                text: _('Check failed'),
+                color: '#d9534f',
+                ipv4: [],
+                ipv6: []
             };
         });
     },
@@ -288,7 +317,8 @@ return view.extend({
                         E('th', { 'class': 'th' }, _('Remote')),
                         E('th', { 'class': 'th' }, _('TUN Address')),
                         E('th', { 'class': 'th' }, _('PID'))
-                    ]),
+                    ])
+                ].concat(
                     tunnels.length > 0 ? tunnels.map(function (t) {
                         var instanceKey = t.mode + '.' + t.id;
                         var instance = serviceStatus.instances[instanceKey];
@@ -311,7 +341,7 @@ return view.extend({
                             E('td', { 'class': 'td', 'colspan': '7', 'style': 'text-align: center; color: #888;' }, _('No tunnels configured'))
                         ])
                     ]
-                ])
+                ))
             ]),
 
             // ==================== System Diagnostics (Compact) ====================
@@ -342,8 +372,7 @@ return view.extend({
 
                     E('div', { 'style': 'font-weight: bold;' }, _('iptables Rules:')),
                     E('div', {},
-                        E('span', { 'style': 'color: ' + (iptablesRules.ipv4.length > 1 || iptablesRules.ipv6.length > 1 ? '#5cb85c' : '#f0ad4e') + ';' },
-                            (iptablesRules.ipv4.length > 1 || iptablesRules.ipv6.length > 1 ? '✓ Active' : '⚠ No rules detected'))
+                        E('span', { 'style': 'color: ' + iptablesRules.color + ';' }, iptablesRules.text)
                     )
                 ])
             ]),
@@ -354,12 +383,13 @@ return view.extend({
                     _('Recent Logs'),
                     E('span', { 'id': 'log-status', 'style': 'font-size: 0.85em;' }, '')
                 ]),
-                E('textarea', {
-                    'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #1e1e1e; color: #ddd; border: 1px solid #444; padding: 10px; border-radius: 3px;',
-                    'readonly': 'readonly',
-                    'wrap': 'off',
-                    'id': 'syslog-textarea'
-                }, logs.join('\n')),
+                E('div', {
+                    'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #1e1e1e; border: 1px solid #444; padding: 10px; border-radius: 3px; overflow-y: auto; white-space: pre;',
+                    'id': 'syslog-container'
+                }, logs.map(function (line) {
+                    var color = self.getLogColor(line);
+                    return E('div', { 'style': 'color: ' + color + ';' }, line);
+                })),
                 E('div', { 'style': 'margin-top: 5px; text-align: right;' }, [
                     E('button', {
                         'class': 'cbi-button cbi-button-negative',
@@ -404,8 +434,8 @@ return view.extend({
                     E('button', {
                         'class': 'cbi-button cbi-button-apply',
                         'click': function () {
-                            var textarea = document.getElementById('syslog-textarea');
-                            var logContent = textarea.value;
+                            var container = document.getElementById('syslog-container');
+                            var logContent = container ? container.textContent : '';
                             var blob = new Blob([logContent], { type: 'text/plain' });
                             var url = URL.createObjectURL(blob);
                             var a = document.createElement('a');
@@ -454,9 +484,16 @@ return view.extend({
     pollLogs: function () {
         var self = this;
         return self.getRecentLogs().then(function (logs) {
-            var textarea = document.getElementById('syslog-textarea');
-            if (textarea) {
-                textarea.value = logs.join('\n');
+            var container = document.getElementById('syslog-container');
+            if (container) {
+                container.innerHTML = '';
+                logs.forEach(function (line) {
+                    var color = self.getLogColor(line);
+                    var div = document.createElement('div');
+                    div.style.color = color;
+                    div.textContent = line;
+                    container.appendChild(div);
+                });
             }
 
             // Update timestamp

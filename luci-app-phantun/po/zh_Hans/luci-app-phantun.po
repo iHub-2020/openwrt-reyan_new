@@ -50,6 +50,53 @@ msgstr "无加密 - Phantun 专注于纯混淆以实现最大性能。"
 msgid "MTU overhead is only 12 bytes (TCP header - UDP header)."
 msgstr "MTU 开销仅为 12 字节（TCP 头 - UDP 头）。"
 
+# General Settings section
+msgid "General Settings"
+msgstr "常规设置"
+
+msgid "Global settings for the Phantun daemon."
+msgstr "Phantun 守护进程的全局设置。"
+
+msgid "Enable Service"
+msgstr "启用服务"
+
+msgid "Master switch. If disabled, no instances will run."
+msgstr "主开关。如果禁用，将不运行任何实例。"
+
+msgid "Log Level"
+msgstr "日志等级"
+
+msgid "Logging verbosity (uses RUST_LOG environment variable)."
+msgstr "日志详细程度（使用 RUST_LOG 环境变量）。"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "Info (Default)"
+msgstr "信息（默认）"
+
+msgid "Debug"
+msgstr "调试"
+
+msgid "Trace (Very Verbose)"
+msgstr "追踪（非常详细）"
+
+# iptables status messages
+msgid "Active (Rules Detected)"
+msgstr "激活（检测到规则）"
+
+msgid "Active"
+msgstr "激活"
+
+msgid "No rules detected"
+msgstr "未检测到规则"
+
+msgid "Check failed"
+msgstr "检查失败"
+
 # Form sections
 msgid "Basic Settings"
 msgstr "基础设置"
