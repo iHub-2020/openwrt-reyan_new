@@ -574,18 +574,7 @@ return view.extend({
             }
 
             // CRITICAL: Add status auto-refresh (not just logs)
-            // CRITICAL: Final Attempt Status Refresh - Use ID-based lookup to find LIVE DOM
-            poll.add(function () {
-                return self.fetchStatusData().then(function (newData) {
-                    // Always find the CURRENT live element in the DOM
-                    var liveContainer = document.getElementById('phantun-status-view');
-                    if (liveContainer) {
-                        self.updateStatusView(liveContainer, newData);
-                    }
-                }).catch(function (err) {
-                    console.error('Phantun: Poll failed', err);
-                });
-            }, 5);  // Refresh status every 5 seconds
+            // Auto-refresh removed per user request to keep code clean
         });
 
         return container;

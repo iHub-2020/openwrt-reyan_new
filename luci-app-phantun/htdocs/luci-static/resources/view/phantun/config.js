@@ -168,11 +168,18 @@ return view.extend({
 
                     // Reset general section to defaults
                     var generalSections = uci.sections('phantun', 'general');
+                    var generalSection;
+
                     if (generalSections.length > 0) {
-                        var generalSection = generalSections[0]['.name'];
-                        uci.set('phantun', generalSection, 'enabled', '1');
-                        uci.set('phantun', generalSection, 'log_level', 'info');
+                        generalSection = generalSections[0]['.name'];
+                    } else {
+                        // Create general section if it doesn't exist
+                        generalSection = uci.add('phantun', 'general');
                     }
+
+                    // Force service to be ENABLED so new instances can start immediately
+                    uci.set('phantun', generalSection, 'enabled', '1');
+                    uci.set('phantun', generalSection, 'log_level', 'info');
 
                     // Save changes
                     return uci.save();
