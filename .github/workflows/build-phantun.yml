@@ -1,0 +1,198 @@
+# ==============================================================================
+# Workflow: Build Phantun IPKs
+# Version: 1.0.0
+#
+# Changelog:
+#   v1.0.0 - Initial release for Phantun
+#          - Build phantun and luci-app-phantun packages
+#          - Support x86_64 and aarch64 architectures
+#          - Automatic release creation with timestamp tags
+# ==============================================================================
+
+name: build-phantun-ipks
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug_build:
+        description: 'Enable verbose build logs (V=s)'
+        required: false
+        default: 'true'
+        type: boolean
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
+            sdk_name: openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
+          
+          - arch: aarch64
+            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8/openwrt-sdk-23.05.5-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
+            sdk_name: openwrt-sdk-23.05.5-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev gawk git gettext libssl-dev xsltproc wget unzip python3 file zstd
+          git config --global --add safe.directory '*'
+
+      - name: Download and Extract OpenWrt SDK
+        run: |
+          wget -q -O sdk.tar.xz ${{ matrix.sdk_url }}
+          tar -xf sdk.tar.xz
+          mv ${{ matrix.sdk_name }} sdk
+
+      - name: Update and Install Feeds
+        working-directory: sdk
+        run: |
+          cat > feeds.conf << 'EOF'
+          src-git-full base https://github.com/openwrt/openwrt.git;openwrt-23.05
+          src-git packages https://github.com/openwrt/packages.git;openwrt-23.05
+          src-git luci https://github.com/openwrt/luci.git;openwrt-23.05
+          src-git routing https://github.com/openwrt/routing.git;openwrt-23.05
+          EOF
+          
+          ./scripts/feeds update -a
+          ./scripts/feeds install luci-base luci-compat iptables ip-full kmod-tun
+
+      - name: Prepare Package Sources
+        run: |
+          cp -R luci-app-phantun sdk/package/
+          cp -R phantun sdk/package/
+          
+          # 确保 zh-cn 软链接存在
+          cd sdk/package/luci-app-phantun/po
+          if [ -d "zh_Hans" ] && [ ! -e "zh-cn" ]; then
+            ln -sf zh_Hans zh-cn
+          fi
+
+      - name: Configure Build
+        working-directory: sdk
+        run: make defconfig
+
+      - name: Compile phantun
+        working-directory: sdk
+        run: |
+          make package/phantun/compile V=s
+          if ! find bin/packages -name "phantun*.ipk" | grep -q .; then
+            echo "ERROR: phantun ipk not found!"
+            exit 1
+          fi
+
+      - name: Compile luci-app-phantun
+        working-directory: sdk
+        run: |
+          make package/luci-app-phantun/compile V=s
+          
+          if ! find bin/packages -name "luci-app-phantun*.ipk" | grep -q .; then
+            echo "ERROR: luci-app-phantun ipk not found!"
+            exit 1
+          fi
+
+      - name: Organize Artifacts
+        run: |
+          mkdir -p artifacts
+          
+          # 1. 收集 phantun (保持原样)
+          find sdk/bin/packages -name "phantun*.ipk" -exec cp {} artifacts/ \;
+          
+          # 2. 收集主程序 (同时提取版本号，用于修复语言包)
+          # 找到主文件 (排除 i18n 文件)
+          MAIN_PKG=$(find sdk/bin/packages -name "luci-app-phantun_*.ipk" ! -name "*i18n*" | head -n 1)
+          cp "$MAIN_PKG" artifacts/
+          
+          # 提取版本号 (例如从 luci-app-phantun_1.0.0-1_all.ipk 提取 1.0.0-1)
+          VERSION=$(basename "$MAIN_PKG" | cut -d'_' -f2)
+          echo "Detected Version: $VERSION"
+          
+          # 3. 收集并修复中文语言包 (只取 zh-cn，且顺手修复 unknown)
+          # 查找生成的中文包 (可能是 unknown，也可能是正常的)
+          I18N_PKG=$(find sdk/bin/packages -name "luci-i18n-phantun-zh-cn*.ipk" | head -n 1)
+          
+          if [ -f "$I18N_PKG" ]; then
+            # 构造正确的文件名
+            NEW_NAME="luci-i18n-phantun-zh-cn_${VERSION}_all.ipk"
+            # 复制并重命名到 artifacts 目录
+            cp "$I18N_PKG" "artifacts/$NEW_NAME"
+            echo "Copied and renamed: $NEW_NAME"
+          else
+            echo "Warning: zh-cn package not found!"
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: phantun-${{ matrix.arch }}
+          path: artifacts/*.ipk
+          retention-days: 7
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      - name: Generate Release Tag
+        id: tag
+        run: echo "tag=v$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Phantun ${{ steps.tag.outputs.tag }}
+          body: |
+            ## Phantun 自动构建
+            构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            
+            ### 包含文件
+            - `phantun`: 核心二进制文件 (phantun_client & phantun_server)
+            - `luci-app-phantun`: Web 管理界面
+            - `luci-i18n-*-zh-cn`: 中文语言包
+            
+            ### 架构支持
+            - x86_64
+            - aarch64
+          files: release-files/*.ipk
+          draft: false
+          prerelease: false
+
+  cleanup:
+    name: Cleanup Old Artifacts
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: '1 day'
+          skip-tags: false
+          skip-recent: 6
+      - name: Delete Old Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          keep_latest: 3
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
