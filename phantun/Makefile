@@ -5,7 +5,7 @@
 #
 # Project: phantun OpenWrt Package
 # Maintainer: iHub-2020
-# Upstream: https://github.com/dndx/phantun
+# Upstream: https://github.com/iHub-2020/phantun
 # Version: Dynamic (Professional Version Management)
 # Last Updated: 2026-01-31
 #
@@ -26,13 +26,13 @@ PKG_NAME:=phantun
 # 从 v1.0.2 开始（phantun当前最新版本）
 # ----------------------------------------------------------------------------
 # 动态获取最新版本，如果获取失败则使用默认版本
-PKG_VERSION:=$(shell curl -s --connect-timeout 10 https://api.github.com/repos/dndx/phantun/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' || echo "1.0.2")
+PKG_VERSION:=$(shell curl -s --connect-timeout 10 https://api.github.com/repos/iHub-2020/phantun/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' || echo "1.0.2")
 PKG_RELEASE:=1
 
 # ============================================================
 # Binary Release Mode Settings
 # ============================================================
-REPO_USER:=dndx
+REPO_USER:=iHub-2020
 REPO_NAME:=phantun
 
 # 动态下载地址，自动匹配最新版本
