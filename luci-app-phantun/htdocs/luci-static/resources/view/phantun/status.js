@@ -248,11 +248,11 @@ return view.extend({
      */
     checkIptablesRules: function () {
         return Promise.all([
-            fs.exec('/usr/sbin/iptables-save'),
-            fs.exec('/usr/sbin/ip6tables-save')
+            L.resolveDefault(fs.exec('/usr/sbin/iptables-save'), {}),
+            L.resolveDefault(fs.exec('/usr/sbin/ip6tables-save'), {})
         ]).then(function (results) {
-            var ipv4Output = results[0].stdout || '';
-            var ipv6Output = results[1].stdout || '';
+            var ipv4Output = (results[0] && results[0].stdout) || '';
+            var ipv6Output = (results[1] && results[1].stdout) || '';
 
             var statusText = _('No rules detected');
             var statusColor = '#f0ad4e';
@@ -560,10 +560,17 @@ return view.extend({
                 logStatusEl.textContent = 'Last updated: ' + timeStr;
                 logStatusEl.style.color = '#888';
 
-                // Start polling
+                // Start polling for logs
                 self.logPollFn = L.bind(self.pollLogs, self);
                 poll.add(self.logPollFn, self.pollInterval);
             }
+
+            // CRITICAL: Add status auto-refresh (not just logs)
+            poll.add(function () {
+                return self.fetchStatusData().then(function (newData) {
+                    self.updateStatusView(container, newData);
+                });
+            }, 5);  // Refresh status every 5 seconds
         });
 
         return container;

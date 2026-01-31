@@ -204,7 +204,10 @@ return view.extend({
                     // Set text and style for reset button
                     resetBtn.textContent = '复位';
                     resetBtn.classList.add('cbi-button-negative');
+
+                    return true;  // CRITICAL: Must return true when button found
                 }
+                return false;  // Return false when button not found
             };
 
             // Apply modifications after a short delay to ensure DOM is ready
