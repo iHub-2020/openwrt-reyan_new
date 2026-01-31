@@ -1,23 +1,46 @@
 {
     "luci-app-phantun": {
-        "description": "Grant access to Phantun configuration",
+        "description": "Grant access to Phantun configuration and status",
         "read": {
             "uci": [
                 "phantun"
             ],
             "file": {
                 "/usr/bin/phantun_client": [
+                    "read",
                     "exec"
                 ],
                 "/usr/bin/phantun_server": [
+                    "read",
                     "exec"
                 ],
                 "/etc/config/phantun": [
                     "read"
+                ],
+                "/sbin/logread": [
+                    "exec"
+                ],
+                "/bin/sh": [
+                    "exec"
+                ],
+                "/usr/sbin/iptables": [
+                    "exec"
+                ],
+                "/usr/sbin/ip6tables": [
+                    "exec"
+                ],
+                "/sbin/ip": [
+                    "exec"
                 ]
             },
             "ubus": {
                 "service": [
+                    "list"
+                ],
+                "file": [
+                    "exec",
+                    "stat",
+                    "read",
                     "list"
                 ]
             }
