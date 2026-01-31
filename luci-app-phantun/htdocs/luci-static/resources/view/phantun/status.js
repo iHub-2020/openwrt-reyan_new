@@ -18,6 +18,7 @@
 'require poll';
 
 var lastClearTime = null;
+var clearedLogCount = 0;  // Track number of logs when cleared
 var callServiceList = rpc.declare({
     object: 'service',
     method: 'list',
@@ -126,35 +127,92 @@ return view.extend({
 
     getRecentLogs: function () {
         var self = this;
-        return fs.exec('/sbin/logread', ['-e', 'phantun']).then(function (res) {
-            var output = res.stdout || '';
-            if (!output && res.code !== 0) {
-                return fs.exec('/bin/sh', ['-c', 'logread | grep phantun | tail -n 150']);
-            }
-            return res;
-        }).then(function (res) {
-            var logContent = res.stdout || '';
-            if (!logContent) return [];
-            var lines = logContent.trim().split('\n');
 
-            // If clear was clicked, only show logs after that time
-            if (lastClearTime) {
+        // Get configured log level
+        return uci.load('phantun').then(function () {
+            var generalSections = uci.sections('phantun', 'general');
+            var logLevel = 'info';  // Default
+            if (generalSections.length > 0) {
+                logLevel = generalSections[0].log_level || 'info';
+            }
+
+            return fs.exec('/sbin/logread', ['-e', 'phantun']).then(function (res) {
+                var output = res.stdout || '';
+                if (!output && res.code !== 0) {
+                    return fs.exec('/bin/sh', ['-c', 'logread | grep phantun | tail -n 150']);
+                }
+                return res;
+            }).then(function (res) {
+                var logContent = res.stdout || '';
+                if (!logContent) return [];
+                var lines = logContent.trim().split('\n');
+
+                // Log level priority mapping
+                var levelPriority = {
+                    'trace': 0,
+                    'debug': 1,
+                    'info': 2,
+                    'warn': 3,
+                    'warning': 3,
+                    'error': 4,
+                    'err': 4
+                };
+
+                var selectedPriority = levelPriority[logLevel] || 2;
+
+                // Filter by log level
                 lines = lines.filter(function (line) {
-                    var match = line.match(/(\w{3}\s+\w{3}\s+\d+\s+\d+:\d+:\d+\s+\d{4})/);
+                    // Extract log level (daemon.info, daemon.warn, daemon.err, etc.)
+                    var match = line.match(/daemon\.(trace|debug|info|warn|warning|err|error)/i);
                     if (match) {
-                        var logTime = new Date(match[1]);
-                        return logTime > lastClearTime;
+                        var linePriority = levelPriority[match[1].toLowerCase()] || 2;
+                        return linePriority >= selectedPriority;
                     }
-                    return false;
+                    return true;  // Show lines without recognizable level
                 });
 
-                // Add highlighted clear marker at the beginning of filtered logs
-                var clearMarker = '=== Logs Cleared (' + lastClearTime.toLocaleString() + ') ===';
-                lines.unshift(clearMarker);
-            }
+                // If clear was clicked, only show logs after that time
+                if (lastClearTime) {
+                    lines = lines.filter(function (line) {
+                        var logTime = self.parseLogTime(line);
+                        if (logTime) {
+                            return logTime > lastClearTime;
+                        }
+                        // Show marker lines
+                        return line.indexOf('===') >= 0;
+                    });
 
-            return lines.slice(-150).map(self.cleanText).reverse();
+                    // Add highlighted clear marker at the beginning of filtered logs
+                    var clearMarker = '=== Logs Cleared (' + lastClearTime.toLocaleString() + ') ===';
+                    lines.unshift(clearMarker);
+                }
+
+                return lines.slice(-150).map(self.cleanText).reverse();
+            });
         });
+    },
+
+    // Parse log timestamp more reliably
+    parseLogTime: function (line) {
+        // Format: Sat Jan 31 22:05:48 2026
+        var match = line.match(/(\w{3})\s+(\w{3})\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d{4})/);
+        if (!match) return null;
+
+        var months = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+
+        var year = parseInt(match[7]);
+        var month = months[match[2]];
+        var day = parseInt(match[3]);
+        var hour = parseInt(match[4]);
+        var minute = parseInt(match[5]);
+        var second = parseInt(match[6]);
+
+        if (month === undefined) return null;
+
+        return new Date(year, month, day, hour, minute, second);
     },
 
     /**
@@ -448,8 +506,16 @@ return view.extend({
                     E('button', {
                         'class': 'cbi-button cbi-button-reset',
                         'click': function () {
-                            lastClearTime = new Date();
+                            // Set clear time with 2 second buffer to avoid edge cases
+                            lastClearTime = new Date(Date.now() - 2000);
+
+                            // Immediately refresh display
                             self.pollLogs();
+
+                            // Show notification
+                            ui.addNotification(null,
+                                E('p', _('Logs cleared. Showing only new logs.')),
+                                'info', 3);
                         }
                     }, _('Clear Logs')),
                     ' ',

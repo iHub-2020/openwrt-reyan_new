@@ -144,6 +144,9 @@ msgstr "重置失败: "
 msgid "Reset"
 msgstr "重置"
 
+msgid "Logs cleared. Showing only new logs."
+msgstr "日志已清理。仅显示新日志。"
+
 # Form sections
 msgid "Basic Settings"
 msgstr "基础设置"
