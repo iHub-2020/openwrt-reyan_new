@@ -453,13 +453,18 @@ return view.extend({
                     }, _('滚动到顶部'))
                 ])
             ])
-        ]);
+        ])
 
-        // 启动日志自动刷新
-        self.logPollFn = L.bind(self.pollLogs, self);
-        poll.add(self.logPollFn, self.pollInterval);
-        document.getElementById('log-status').textContent = '▶ ' + _('自动刷新中');
-        document.getElementById('log-status').style.color = '#5cb85c';
+        // 启动日志自动刷新（延迟到 DOM 渲染完成后）
+        requestAnimationFrame(function () {
+            var logStatusEl = document.getElementById('log-status');
+            if (logStatusEl) {
+                self.logPollFn = L.bind(self.pollLogs, self);
+                poll.add(self.logPollFn, self.pollInterval);
+                logStatusEl.textContent = '▶ ' + _('自动刷新中');
+                logStatusEl.style.color = '#5cb85c';
+            }
+        });
 
         return container;
     },
