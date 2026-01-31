@@ -144,6 +144,7 @@ return view.extend({
         o.default = 'info';
 
 
+
         // ==================== Server Instances ====================
         s = m.section(form.GridSection, 'server', _('服务器端实例'),
             _('<b>服务器模式:</b> OpenWrt 监听来自 Phantun 客户端的 TCP 连接并转发到本地 UDP 服务。<br/>' +
@@ -153,6 +154,44 @@ return view.extend({
         s.sortable = true;
         s.nodescriptions = true;
         s.addbtntitle = _('添加服务器');
+
+        // Override renderSectionAdd to add import/export buttons for servers
+        s.renderSectionAdd = function (extra_class) {
+            var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+
+            // Create import button (styled like edit button)
+            var importBtn = E('button', {
+                'class': 'cbi-button cbi-button-positive',
+                'style': 'margin-left: 5px;',
+                'title': _('Import server configurations'),
+                'click': function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    ui.addNotification(null, E('p', _('导入功能开发中...')), 'info');
+                }
+            }, _('导入服务器'));
+
+            // Create export button (styled like delete button)
+            var exportBtn = E('button', {
+                'class': 'cbi-button cbi-button-apply',
+                'style': 'margin-left: 5px;',
+                'title': _('Export server configurations'),
+                'click': function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    ui.addNotification(null, E('p', _('导出功能开发中...')), 'info');
+                }
+            }, _('导出服务器'));
+
+            // Insert buttons directly into the existing button container
+            var addBtn = el.querySelector('.cbi-button-add');
+            if (addBtn && addBtn.parentNode) {
+                addBtn.parentNode.appendChild(importBtn);
+                addBtn.parentNode.appendChild(exportBtn);
+            }
+
+            return el;
+        };
 
         s.sectiontitle = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');
@@ -247,6 +286,7 @@ return view.extend({
         o.optional = true;
         o.modalonly = true;
 
+
         // ==================== Client Instances ====================
         s = m.section(form.GridSection, 'client', _('客户端实例'),
             _('<b>客户端模式:</b> OpenWrt 在本地监听 UDP 并连接到远程 Phantun 服务器。<br/>' +
@@ -256,6 +296,44 @@ return view.extend({
         s.sortable = true;
         s.nodescriptions = true;
         s.addbtntitle = _('添加客户端');
+
+        // Override renderSectionAdd to add import/export buttons for clients
+        s.renderSectionAdd = function (extra_class) {
+            var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+
+            // Create import button
+            var importBtn = E('button', {
+                'class': 'cbi-button cbi-button-positive',
+                'style': 'margin-left: 5px;',
+                'title': _('Import client configurations'),
+                'click': function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    ui.addNotification(null, E('p', _('导入功能开发中...')), 'info');
+                }
+            }, _('导入客户端'));
+
+            // Create export button
+            var exportBtn = E('button', {
+                'class': 'cbi-button cbi-button-apply',
+                'style': 'margin-left: 5px;',
+                'title': _('Export client configurations'),
+                'click': function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    ui.addNotification(null, E('p', _('导出功能开发中...')), 'info');
+                }
+            }, _('导出客户端'));
+
+            // Insert buttons directly into the existing button container
+            var addBtn = el.querySelector('.cbi-button-add');
+            if (addBtn && addBtn.parentNode) {
+                addBtn.parentNode.appendChild(importBtn);
+                addBtn.parentNode.appendChild(exportBtn);
+            }
+
+            return el;
+        };
 
         s.sectiontitle = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');

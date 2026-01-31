@@ -267,117 +267,84 @@ return view.extend({
         var container = E('div', { 'class': 'cbi-map' }, [
             E('h2', {}, _('Phantun 状态')),
 
-            // ==================== 服务状态 ====================
+            // ==================== 服务状态 (简洁版) ====================
             E('div', { 'class': 'cbi-section' }, [
-                E('h3', {}, _('服务状态')),
-                E('table', { 'class': 'table', 'style': 'width: auto;' }, [
-                    E('tr', {}, [
-                        E('td', { 'style': 'font-weight: bold; padding-right: 20px;' }, _('状态:')),
-                        E('td', {}, E('span', { 'style': 'color: ' + statusColor + '; font-weight: bold;' }, statusText))
-                    ]),
-                    E('tr', {}, [
-                        E('td', { 'style': 'font-weight: bold;' }, _('活跃实例:')),
-                        E('td', {}, String(instanceCount))
-                    ])
+                E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
+                    E('div', { 'style': 'width: 150px; font-weight: bold;' }, _('服务状态:')),
+                    E('div', { 'style': 'font-weight: bold; color: ' + statusColor + ';' },
+                        statusText + (instanceCount > 0 ? ' (' + instanceCount + ' 实例)' : ''))
                 ])
             ]),
 
             // ==================== 隧道状态表 ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', {}, _('隧道状态')),
-                E('div', { 'class': 'table-wrapper' }, [
-                    E('table', { 'class': 'table' }, [
-                        E('thead', {}, [
-                            E('tr', {}, [
-                                E('th', { 'class': 'th' }, _('名称')),
-                                E('th', { 'class': 'th' }, _('模式')),
-                                E('th', { 'class': 'th' }, _('状态')),
-                                E('th', { 'class': 'th' }, _('本地')),
-                                E('th', { 'class': 'th' }, _('远程')),
-                                E('th', { 'class': 'th' }, _('TUN 地址')),
-                                E('th', { 'class': 'th' }, _('PID'))
-                            ])
-                        ]),
-                        E('tbody', {}, tunnels.length > 0 ? tunnels.map(function (t) {
-                            var instanceKey = t.mode + '.' + t.id;
-                            var instance = serviceStatus.instances[instanceKey];
-                            var isActive = instance && instance.pid;
-                            var rowColor = t.disabled ? '#888' : (isActive ? '#5cb85c' : '#d9534f');
-                            var statusIcon = t.disabled ? '⏸' : (isActive ? '✓' : '✗');
-                            var statusLabel = t.disabled ? _('已禁用') : (isActive ? _('运行中') : _('已停止'));
+                E('table', { 'class': 'table cbi-section-table' }, [
+                    E('tr', { 'class': 'tr table-titles' }, [
+                        E('th', { 'class': 'th' }, _('名称')),
+                        E('th', { 'class': 'th' }, _('模式')),
+                        E('th', { 'class': 'th' }, _('状态')),
+                        E('th', { 'class': 'th' }, _('本地')),
+                        E('th', { 'class': 'th' }, _('远程')),
+                        E('th', { 'class': 'th' }, _('TUN 地址')),
+                        E('th', { 'class': 'th' }, _('PID'))
+                    ]),
+                    tunnels.length > 0 ? tunnels.map(function (t) {
+                        var instanceKey = t.mode + '.' + t.id;
+                        var instance = serviceStatus.instances[instanceKey];
+                        var isActive = instance && instance.pid;
+                        var rowColor = t.disabled ? '#888' : (isActive ? '#5cb85c' : '#d9534f');
+                        var statusIcon = t.disabled ? '⏸' : (isActive ? '✓' : '✗');
+                        var statusLabel = t.disabled ? _('已禁用') : (isActive ? _('运行中') : _('已停止'));
 
-                            return E('tr', {}, [
-                                E('td', {}, t.alias),
-                                E('td', {}, t.mode === 'server' ? _('服务器') : _('客户端')),
-                                E('td', {}, E('span', { 'style': 'color: ' + rowColor + '; font-weight: bold;' }, statusIcon + ' ' + statusLabel)),
-                                E('td', {}, t.local),
-                                E('td', {}, t.remote),
-                                E('td', {}, t.tun_local + ' ↔ ' + t.tun_peer),
-                                E('td', {}, isActive ? String(instance.pid) : '-')
-                            ]);
-                        }) : [
-                            E('tr', {}, [
-                                E('td', { 'colspan': '7', 'style': 'text-align: center; color: #888;' }, _('没有配置的隧道'))
-                            ])
+                        return E('tr', { 'class': 'tr' }, [
+                            E('td', { 'class': 'td' }, t.alias),
+                            E('td', { 'class': 'td' }, t.mode === 'server' ? _('服务器') : _('客户端')),
+                            E('td', { 'class': 'td' }, E('span', { 'style': 'color: ' + rowColor + '; font-weight: bold;' }, statusIcon + ' ' + statusLabel)),
+                            E('td', { 'class': 'td' }, t.local),
+                            E('td', { 'class': 'td' }, t.remote),
+                            E('td', { 'class': 'td' }, t.tun_local + ' ↔ ' + t.tun_peer),
+                            E('td', { 'class': 'td' }, isActive ? String(instance.pid) : '-')
+                        ]);
+                    }) : [
+                        E('tr', { 'class': 'tr' }, [
+                            E('td', { 'class': 'td', 'colspan': '7', 'style': 'text-align: center; color: #888;' }, _('没有配置的隧道'))
                         ])
-                    ])
+                    ]
                 ])
             ]),
 
-            // ==================== 系统诊断 ====================
+            // ==================== 系统诊断 (简洁版) ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', {}, _('系统诊断')),
+                E('div', { 'style': 'display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 10px 0;' }, [
+                    E('div', { 'style': 'font-weight: bold;' }, _('核心程序:')),
+                    E('div', {}, md5s.error ?
+                        E('span', { 'style': 'color: #d9534f;' }, '❌ ' + md5s.error) :
+                        E('span', { 'style': 'color: #5cb85c;' }, '✓ 已验证 (' +
+                            (md5s.phantun_client ? 'Client: ' + md5s.phantun_client.substring(0, 8) + '... ' : '') +
+                            (md5s.phantun_server ? 'Server: ' + md5s.phantun_server.substring(0, 8) + '...' : '') + ')')
+                    ),
 
-                // 二进制文件验证
-                E('h4', { 'style': 'margin-top: 15px;' }, _('二进制文件验证')),
-                E('table', { 'class': 'table', 'style': 'width: auto;' }, [
-                    md5s.error ?
-                        E('tr', {}, [
-                            E('td', { 'colspan': '2', 'style': 'color: #d9534f;' }, '❌ ' + md5s.error)
-                        ]) :
-                        Object.keys(md5s).map(function (binary) {
-                            return E('tr', {}, [
-                                E('td', { 'style': 'font-weight: bold; padding-right: 20px;' }, binary + ':'),
-                                E('td', { 'style': 'font-family: monospace; font-size: 0.9em;' }, md5s[binary])
+                    E('div', { 'style': 'font-weight: bold;' }, _('TUN 接口:')),
+                    E('div', {}, tunInterfaces && tunInterfaces.length > 0 ?
+                        tunInterfaces.map(function (iface) {
+                            var stateColor = iface.state === 'UP' ? '#5cb85c' : '#d9534f';
+                            return E('div', {}, [
+                                E('span', { 'style': 'color: ' + stateColor + '; font-weight: bold;' }, iface.name + ': ' + iface.state),
+                                E('span', { 'style': 'margin-left: 10px; color: #888;' },
+                                    (iface.ipv4.length > 0 ? iface.ipv4.join(', ') : '') +
+                                    (iface.ipv6.length > 0 ? ' / ' + iface.ipv6.join(', ') : ''))
                             ]);
-                        })
-                ]),
+                        }) :
+                        E('span', { 'style': 'color: #888;' }, _('无'))
+                    ),
 
-                // TUN 接口信息
-                E('h4', { 'style': 'margin-top: 15px;' }, _('TUN 接口信息')),
-                tunInterfaces && tunInterfaces.length > 0 ?
-                    E('table', { 'class': 'table' }, [
-                        E('thead', {}, [
-                            E('tr', {}, [
-                                E('th', {}, _('接口')),
-                                E('th', {}, _('状态')),
-                                E('th', {}, _('IPv4 地址')),
-                                E('th', {}, _('IPv6 地址'))
-                            ])
-                        ]),
-                        E('tbody', {}, tunInterfaces.map(function (iface) {
-                            return E('tr', {}, [
-                                E('td', {}, iface.name),
-                                E('td', {}, E('span', {
-                                    'style': 'color: ' + (iface.state === 'UP' ? '#5cb85c' : '#d9534f') + '; font-weight: bold;'
-                                }, iface.state)),
-                                E('td', {}, iface.ipv4.length > 0 ? iface.ipv4.join(', ') : '-'),
-                                E('td', {}, iface.ipv6.length > 0 ? iface.ipv6.join(', ') : '-')
-                            ]);
-                        }))
-                    ]) :
-                    E('p', { 'style': 'color: #888;' }, _('没有找到 TUN 接口')),
-
-                // iptables 规则检查
-                E('h4', { 'style': 'margin-top: 15px;' }, _('iptables 规则检查')),
-                E('div', {}, [
-                    E('p', { 'style': 'font-weight: bold; margin-bottom: 5px;' }, _('IPv4 NAT 规则:')),
-                    E('pre', { 'style': 'background: #2d3a4a; color: #ddd; padding: 10px; border-radius: 3px; font-size: 0.85em; overflow-x: auto;' },
-                        iptablesRules.ipv4.join('\n')),
-
-                    E('p', { 'style': 'font-weight: bold; margin-bottom: 5px; margin-top: 15px;' }, _('IPv6 NAT 规则:')),
-                    E('pre', { 'style': 'background: #2d3a4a; color: #ddd; padding: 10px; border-radius: 3px; font-size: 0.85em; overflow-x: auto;' },
-                        iptablesRules.ipv6.join('\n'))
+                    E('div', { 'style': 'font-weight: bold;' }, _('iptables 规则:')),
+                    E('div', {},
+                        E('span', { 'style': 'color: ' + (iptablesRules.ipv4.length > 1 || iptablesRules.ipv6.length > 1 ? '#5cb85c' : '#f0ad4e') + ';' },
+                            (iptablesRules.ipv4.length > 1 || iptablesRules.ipv6.length > 1 ? '✓ 已激活' : '⚠ 未检测到规则'))
+                    )
                 ])
             ]),
 
@@ -401,8 +368,11 @@ return view.extend({
                             if (self.logPollFn) {
                                 poll.remove(self.logPollFn);
                                 self.logPollFn = null;
-                                document.getElementById('log-status').textContent = '⏸ ' + _('已暂停');
-                                document.getElementById('log-status').style.color = '#f0ad4e';
+                                var logStatusEl = document.getElementById('log-status');
+                                if (logStatusEl) {
+                                    logStatusEl.textContent = '⏸ ' + _('已暂停');
+                                    logStatusEl.style.color = '#f0ad4e';
+                                }
                             }
                         }
                     }, _('停止刷新')),
@@ -414,8 +384,11 @@ return view.extend({
                             if (!self.logPollFn) {
                                 self.logPollFn = L.bind(self.pollLogs, self);
                                 poll.add(self.logPollFn, self.pollInterval);
-                                document.getElementById('log-status').textContent = '▶ ' + _('自动刷新中');
-                                document.getElementById('log-status').style.color = '#5cb85c';
+                                var logStatusEl = document.getElementById('log-status');
+                                if (logStatusEl) {
+                                    logStatusEl.textContent = '▶ ' + _('自动刷新中');
+                                    logStatusEl.style.color = '#5cb85c';
+                                }
                             }
                         }
                     }, _('开始刷新')),
@@ -425,7 +398,7 @@ return view.extend({
                         'click': function () {
                             lastClearTime = new Date();
                             self.pollLogs();
-                            ui.addNotification(null, E('p', _('日志已清理，只显示此刻之后的新日志')), 'info');
+                            ui.addNotification(null, E('p', _('日志已清理,只显示此刻之后的新日志')), 'info');
                         }
                     }, _('清理日志')),
                     ' ',
