@@ -49,13 +49,20 @@ return view.extend({
     },
 
     getServiceStatus: function () {
-        return L.resolveDefault(callServiceList('phantun'), {}).then(function (res) {
+        return Promise.all([
+            L.resolveDefault(callServiceList('phantun'), {}),
+            fs.exec('/bin/sh', ['-c', 'pgrep -f phantun_server || pgrep -f phantun_client'])
+        ]).then(function (results) {
+            var serviceList = results[0];
+            var psOutput = results[1];
+
             var instances = {};
             var isRunning = false;
 
-            if (res && res.phantun && res.phantun.instances) {
-                for (var key in res.phantun.instances) {
-                    var inst = res.phantun.instances[key];
+            // Check service list first
+            if (serviceList && serviceList.phantun && serviceList.phantun.instances) {
+                for (var key in serviceList.phantun.instances) {
+                    var inst = serviceList.phantun.instances[key];
                     if (inst && inst.running) {
                         isRunning = true;
                         instances[key] = {
@@ -65,6 +72,12 @@ return view.extend({
                     }
                 }
             }
+
+            // Fallback: check if processes exist
+            if (!isRunning && psOutput && psOutput.code === 0 && psOutput.stdout && psOutput.stdout.trim()) {
+                isRunning = true;
+            }
+
             return { running: isRunning, instances: instances };
         });
     },
@@ -185,19 +198,24 @@ return view.extend({
 
             var statusText = _('No rules detected');
             var statusColor = '#f0ad4e';
-            var chainNames = [];
+            var ruleTypes = [];
 
-            // Detect phantun chains
-            var chainMatches = ipv4Output.match(/:phantun[^\s]*/g);
-            if (chainMatches && chainMatches.length > 0) {
-                chainNames = chainMatches.map(function (s) { return s.substring(1); });
-                statusText = _('Active') + ' (' + chainNames.join(', ') + ')';
-                statusColor = '#5cb85c';
-            } else if (ipv4Output.indexOf('phantun') !== -1) {
-                // Check for MASQUERADE/DNAT rules
-                var ruleTypes = [];
-                if (ipv4Output.indexOf('MASQUERADE') !== -1) ruleTypes.push('MASQUERADE');
-                if (ipv4Output.indexOf('DNAT') !== -1) ruleTypes.push('DNAT');
+            // Check for phantun-related rules by IP ranges
+            var hasPhantunRules = ipv4Output.indexOf('192.168.200') !== -1 ||
+                ipv4Output.indexOf('192.168.201') !== -1 ||
+                ipv6Output.indexOf('fcc8') !== -1 ||
+                ipv6Output.indexOf('fcc9') !== -1;
+
+            if (hasPhantunRules) {
+                // Detect rule types
+                if (ipv4Output.indexOf('MASQUERADE') !== -1 &&
+                    (ipv4Output.indexOf('192.168.200') !== -1 || ipv4Output.indexOf('192.168.201') !== -1)) {
+                    ruleTypes.push('MASQUERADE');
+                }
+                if (ipv4Output.indexOf('DNAT') !== -1 &&
+                    (ipv4Output.indexOf('192.168.200') !== -1 || ipv4Output.indexOf('192.168.201') !== -1)) {
+                    ruleTypes.push('DNAT');
+                }
 
                 if (ruleTypes.length > 0) {
                     statusText = _('Active') + ' (' + ruleTypes.join(', ') + ')';
@@ -211,8 +229,12 @@ return view.extend({
             return {
                 text: statusText,
                 color: statusColor,
-                ipv4: ipv4Output.split('\n').filter(function (l) { return l.indexOf('phantun') !== -1; }),
-                ipv6: ipv6Output.split('\n').filter(function (l) { return l.indexOf('phantun') !== -1; })
+                ipv4: ipv4Output.split('\n').filter(function (l) {
+                    return l.indexOf('192.168.200') !== -1 || l.indexOf('192.168.201') !== -1;
+                }),
+                ipv6: ipv6Output.split('\n').filter(function (l) {
+                    return l.indexOf('fcc8') !== -1 || l.indexOf('fcc9') !== -1;
+                })
             };
         }).catch(function (err) {
             return {

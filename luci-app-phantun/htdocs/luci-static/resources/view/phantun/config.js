@@ -38,6 +38,13 @@ var callInitAction = rpc.declare({
     expect: { result: false }
 });
 
+var callInitAction = rpc.declare({
+    object: 'luci',
+    method: 'setInitAction',
+    params: ['name', 'action'],
+    expect: { result: false }
+});
+
 return view.extend({
     title: _('TCP Tunnel Configuration'),
 
@@ -77,10 +84,33 @@ return view.extend({
         m = new form.Map('phantun', _('TCP Tunnel Configuration'),
             _('TCP Tunnel (Phantun) is a lightweight UDP to TCP obfuscator. It creates TUN interfaces and requires proper iptables NAT rules. ' +
                 'Configure client mode to connect to a server, or server mode to accept client connections.'));
-        
-        m.handleSaveApply = null;
-        m.handleSave = null;
-        m.handleReset = null;
+
+        // Override "Save & Apply" to control service based on enabled flag
+        m.handleSaveApply = function (ev, mode) {
+            return this.save(function () {
+                ui.showModal(_('Applying Configuration'), [
+                    E('p', { 'class': 'spinning' }, _('Saving configuration...'))
+                ]);
+
+                // Get the enabled status from general section
+                var generalSections = uci.sections('phantun', 'general');
+                var enabled = generalSections.length > 0 ?
+                    uci.get('phantun', generalSections[0]['.name'], 'enabled') : '1';
+                var action = enabled === '1' ? 'start' : 'stop';
+
+                return callInitAction('phantun', action).then(function () {
+                    ui.hideModal();
+                    ui.addNotification(null, E('p', _('Configuration applied successfully')), 'info');
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                }).catch(function (err) {
+                    ui.hideModal();
+                    ui.addNotification(null, E('p', _('Configuration saved but failed to control service: ') + (err.message || err)), 'error');
+                });
+            });
+        };
+
+        m.handleSave = null;  // Use default save behavior
+        m.handleReset = null; // Use default reset behavior
 
         // ==================== Import/Export Functions ====================
 

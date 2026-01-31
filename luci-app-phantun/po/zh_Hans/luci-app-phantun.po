@@ -97,6 +97,19 @@ msgstr "未检测到规则"
 msgid "Check failed"
 msgstr "检查失败"
 
+# Save/Apply messages
+msgid "Applying Configuration"
+msgstr "应用配置"
+
+msgid "Saving configuration..."
+msgstr "正在保存配置..."
+
+msgid "Configuration applied successfully"
+msgstr "配置应用成功"
+
+msgid "Configuration saved but failed to control service: "
+msgstr "配置已保存但无法控制服务: "
+
 # Form sections
 msgid "Basic Settings"
 msgstr "基础设置"
