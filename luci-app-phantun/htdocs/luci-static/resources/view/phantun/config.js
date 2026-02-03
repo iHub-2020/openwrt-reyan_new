@@ -38,13 +38,6 @@ var callInitAction = rpc.declare({
     expect: { result: false }
 });
 
-var callInitAction = rpc.declare({
-    object: 'luci',
-    method: 'setInitAction',
-    params: ['name', 'action'],
-    expect: { result: false }
-});
-
 return view.extend({
     title: _('TCP Tunnel Configuration'),
 
@@ -85,29 +78,8 @@ return view.extend({
             _('TCP Tunnel (Phantun) is a lightweight UDP to TCP obfuscator. It creates TUN interfaces and requires proper iptables NAT rules. ' +
                 'Configure client mode to connect to a server, or server mode to accept client connections.'));
 
-        // Override "Save & Apply" to control service based on enabled flag
-        m.handleSaveApply = function (ev, mode) {
-            return this.save(function () {
-                ui.showModal(_('Applying Configuration'), [
-                    E('p', { 'class': 'spinning' }, _('Saving configuration...'))
-                ]);
+        // Initial handleSaveApply definition removed (overridden later)
 
-                // Get the enabled status from general section
-                var generalSections = uci.sections('phantun', 'general');
-                var enabled = generalSections.length > 0 ?
-                    uci.get('phantun', generalSections[0]['.name'], 'enabled') : '1';
-                var action = enabled === '1' ? 'start' : 'stop';
-
-                return callInitAction('phantun', action).then(function () {
-                    ui.hideModal();
-                    ui.addNotification(null, E('p', _('Configuration applied successfully')), 'info');
-                    setTimeout(function () { window.location.reload(); }, 1500);
-                }).catch(function (err) {
-                    ui.hideModal();
-                    ui.addNotification(null, E('p', _('Configuration saved but failed to control service: ') + (err.message || err)), 'error');
-                });
-            });
-        };
 
         m.handleSave = null;  // Use default save behavior
         m.handleReset = null; // Disable default reset (we'll override it)
@@ -224,7 +196,7 @@ return view.extend({
                     resetBtn.classList.remove('cbi-button-positive', 'cbi-button-negative', 'cbi-button-neutral');
 
                     // Set text and style for reset button
-                    resetBtn.textContent = '复位';
+                    resetBtn.textContent = _('Reset');
                     resetBtn.classList.add('cbi-button-negative');
 
                     return true;
@@ -566,6 +538,9 @@ return view.extend({
             });
         };
 
+        // Inject styles
+        ui.addNotification(null, E('link', { 'rel': 'stylesheet', 'href': L.resource('phantun/style.css') }));
+
         // ==================== Service Status Logic ====================
         var isRunning = false;
         var runningCount = 0;
@@ -582,7 +557,7 @@ return view.extend({
             }
         } catch (e) { console.error(e); }
 
-        var statusColor = isRunning ? '#5cb85c' : '#d9534f';
+        var statusColor = isRunning ? 'var(--accent-success)' : 'var(--accent-error)';
         var statusText = isRunning
             ? _('Running') + ' (' + runningCount + ' ' + _('instances active') + ')'
             : _('Stopped');
@@ -590,23 +565,11 @@ return view.extend({
         // ==================== Info & Warning Area ====================
         m.description = E('div', {}, [
             // Status Bar
-            E('div', { 'class': 'cbi-section', 'style': 'margin-bottom: 10px; padding: 10px; background: #2d3a4a; border-radius: 5px;' }, [
-                E('table', { 'style': 'width: auto;' }, [
-                    E('tr', {}, [
-                        E('td', { 'style': 'font-weight: bold; padding-right: 10px;' }, _('Service Status:')),
-                        E('td', {}, E('span', { 'style': 'color: ' + statusColor + '; font-weight: bold;' }, statusText))
-                    ])
-                ])
-            ]),
-            // Important Information
-            E('div', { 'class': 'alert-message warning', 'style': 'margin-bottom: 20px; background-color: #d4a017;' }, [
-                E('h4', { 'style': 'margin: 0 0 10px 0;' }, '⚠️ ' + _('Important Safety Information')),
-                E('ul', { 'style': 'margin: 0; padding-left: 20px;' }, [
-                    E('li', {}, _('Phantun creates TUN interfaces and uses FakeTCP to obfuscate UDP traffic.')),
-                    E('li', {}, _('Client mode requires MASQUERADE iptables rules (automatically added).')),
-                    E('li', {}, _('Server mode requires DNAT iptables rules (automatically added).')),
-                    E('li', {}, _('No encryption - Phantun focuses on pure obfuscation for maximum performance.')),
-                    E('li', {}, _('MTU overhead is only 12 bytes (TCP header - UDP header).'))
+            E('div', { 'class': 'cbi-section phantun-card', 'style': 'margin-bottom: 20px; padding: 15px; display: flex; align-items: center; justify-content: space-between;' }, [
+                E('div', { 'style': 'font-weight: bold; font-size: 1.1em;' }, _('Service Status')),
+                E('div', { 'style': 'display: flex; align-items: center; gap: 10px;' }, [
+                    E('div', { 'class': 'status-dot ' + (isRunning ? 'running' : 'stopped') }),
+                    E('span', { 'style': 'color: ' + statusColor + '; font-weight: bold;' }, statusText)
                 ])
             ])
         ]);
@@ -647,33 +610,60 @@ return view.extend({
         s.renderSectionAdd = function (extra_class) {
             var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 
-            // Create import button (styled like edit button)
+            // Create import button (icon only)
             var importBtn = E('button', {
-                'class': 'cbi-button cbi-button-positive',
-                'style': 'margin-left: 5px;',
+                'class': 'cbi-button cbi-button-positive icon-btn',
+                'style': 'margin-left: 5px; padding: 6px 10px;',
                 'title': _('Import server configurations'),
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
                     importServerConfig();
                 }
-            }, _('Import Servers'));
+            }, E('div', { 'style': 'width: 16px; height: 16px; display: flex;' },
+                // Upload Icon
+                E('svg', {
+                    'viewBox': '0 0 24 24',
+                    'fill': 'none',
+                    'stroke': 'currentColor',
+                    'stroke-width': '2'
+                }, [
+                    E('path', { 'd': 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+                    E('polyline', { 'points': '17 8 12 3 7 8' }),
+                    E('line', { 'x1': '12', 'y1': '3', 'x2': '12', 'y2': '15' })
+                ])
+            ));
 
-            // Create export button (styled like delete button)
+            // Create export button (icon only)
             var exportBtn = E('button', {
-                'class': 'cbi-button cbi-button-apply',
-                'style': 'margin-left: 5px;',
+                'class': 'cbi-button cbi-button-apply icon-btn',
+                'style': 'margin-left: 5px; padding: 6px 10px;',
                 'title': _('Export server configurations'),
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
                     exportServerConfig();
                 }
-            }, _('Export Servers'));
+            }, E('div', { 'style': 'width: 16px; height: 16px; display: flex;' },
+                // Download Icon
+                E('svg', {
+                    'viewBox': '0 0 24 24',
+                    'fill': 'none',
+                    'stroke': 'currentColor',
+                    'stroke-width': '2',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round'
+                }, [
+                    E('path', { 'd': 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+                    E('polyline', { 'points': '7 10 12 15 17 10' }),
+                    E('line', { 'x1': '12', 'y1': '15', 'x2': '12', 'y2': '3' })
+                ])
+            ));
 
             // Insert buttons directly into the existing button container
             var addBtn = el.querySelector('.cbi-button-add');
             if (addBtn && addBtn.parentNode) {
+                addBtn.textContent = _('Add'); // Shorten text
                 addBtn.parentNode.appendChild(importBtn);
                 addBtn.parentNode.appendChild(exportBtn);
             }
@@ -791,31 +781,58 @@ return view.extend({
 
             // Create import button
             var importBtn = E('button', {
-                'class': 'cbi-button cbi-button-positive',
-                'style': 'margin-left: 5px;',
+                'class': 'cbi-button cbi-button-positive icon-btn',
+                'style': 'margin-left: 5px; padding: 6px 10px;',
                 'title': _('Import client configurations'),
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
                     importClientConfig();
                 }
-            }, _('Import Clients'));
+            }, E('div', { 'style': 'width: 16px; height: 16px; display: flex;' },
+                // Upload Icon
+                E('svg', {
+                    'viewBox': '0 0 24 24',
+                    'fill': 'none',
+                    'stroke': 'currentColor',
+                    'stroke-width': '2'
+                }, [
+                    E('path', { 'd': 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+                    E('polyline', { 'points': '17 8 12 3 7 8' }),
+                    E('line', { 'x1': '12', 'y1': '3', 'x2': '12', 'y2': '15' })
+                ])
+            ));
 
             // Create export button
             var exportBtn = E('button', {
-                'class': 'cbi-button cbi-button-apply',
-                'style': 'margin-left: 5px;',
+                'class': 'cbi-button cbi-button-apply icon-btn',
+                'style': 'margin-left: 5px; padding: 6px 10px;',
                 'title': _('Export client configurations'),
                 'click': function (ev) {
                     ev.preventDefault();
                     ev.stopPropagation();
                     exportClientConfig();
                 }
-            }, _('Export Clients'));
+            }, E('div', { 'style': 'width: 16px; height: 16px; display: flex;' },
+                // Download Icon
+                E('svg', {
+                    'viewBox': '0 0 24 24',
+                    'fill': 'none',
+                    'stroke': 'currentColor',
+                    'stroke-width': '2',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round'
+                }, [
+                    E('path', { 'd': 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+                    E('polyline', { 'points': '7 10 12 15 17 10' }),
+                    E('line', { 'x1': '12', 'y1': '15', 'x2': '12', 'y2': '3' })
+                ])
+            ));
 
             // Insert buttons directly into the existing button container
             var addBtn = el.querySelector('.cbi-button-add');
             if (addBtn && addBtn.parentNode) {
+                addBtn.textContent = _('Add'); // Shorten text
                 addBtn.parentNode.appendChild(importBtn);
                 addBtn.parentNode.appendChild(exportBtn);
             }
@@ -867,10 +884,10 @@ return view.extend({
         o.rmempty = false;
         o.width = '15%';
 
-        o = s.taboption('basic', form.Value, 'local_port', _('Local Port'));
+        o = s.taboption('basic', form.Value, 'local_port', _('Local UDP Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '15%';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),

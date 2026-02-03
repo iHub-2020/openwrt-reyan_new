@@ -11,6 +11,14 @@
 			]
 		}
 	},
+	"admin/services/phantun/dashboard": {
+		"title": "Dashboard",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "phantun/dashboard"
+		}
+	},
 	"admin/services/phantun/config": {
 		"title": "Configuration",
 		"order": 10,

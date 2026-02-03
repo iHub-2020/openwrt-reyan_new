@@ -1,0 +1,243 @@
+/* ========================================
+   PHANTUN MANAGER - INDUSTRIAL DARK THEME
+   (Ported from Phantun Docker Project)
+   ======================================== */
+
+/* Scope everything under a specific class if possible, or use specific selectors */
+/* Since LuCI has its own theme, we should try to be specific or use !important where needed 
+   BUT for this "Industrial Theme" request, we will define our variables. 
+   To avoid polluting global scope too much, we might want to wrap our views.
+   However, for now, we'll try to provide the variables. */
+
+:root {
+    /* ===== COLORS ===== */
+    --bg-body: #020617;
+    --bg-card: #0F172A;
+    --bg-card-hover: #1E293B;
+    --bg-input: #1E293B;
+    --bg-header: #0F172A;
+    --bg-modal-overlay: rgba(0, 0, 0, 0.75);
+    --bg-elevated: #1E293B;
+
+    /* Borders */
+    --border: #334155;
+    --border-light: #475569;
+    --border-focus: var(--accent-success);
+
+    /* Text */
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --text-disabled: #475569;
+
+    /* Accents */
+    --accent-primary: #3B82F6;
+    --accent-success: #22C55E;
+    --accent-error: #EF4444;
+    --accent-warning: #F59E0B;
+    --accent-info: #06B6D4;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+
+    /* Fonts */
+    --font-mono: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+    --font-sans: system-ui, -apple-system, sans-serif;
+}
+
+/* === UTILITIES & COMPONENTS === */
+
+/* Custom Card Style for LuCI map/section */
+.phantun-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+/* Status Indicators */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.running {
+    background: var(--accent-success);
+    box-shadow: 0 0 8px var(--accent-success);
+}
+
+.status-dot.stopped {
+    background: var(--text-muted);
+}
+
+/* SVG Topology Styles */
+svg.topo-svg {
+    width: 100%;
+    height: 80px;
+    min-width: 600px;
+    overflow: visible;
+}
+
+.flow-line {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 2;
+    stroke-dasharray: 4, 4;
+}
+
+.flow-line.active {
+    stroke: var(--accent-success);
+    stroke-dasharray: 8, 8;
+    animation: flowAnimation 1s linear infinite;
+}
+
+.flow-line.stopped {
+    stroke: var(--accent-error);
+    stroke-dasharray: 0;
+}
+
+@keyframes flowAnimation {
+    from {
+        stroke-dashoffset: 200;
+    }
+
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Node Styling */
+.node-circle {
+    fill: var(--bg-card);
+    stroke: var(--accent-primary);
+    stroke-width: 2;
+}
+
+.node-circle.server {
+    stroke: var(--accent-warning);
+}
+
+.node-circle.client {
+    stroke: var(--accent-info);
+}
+
+.node-circle.internet {
+    stroke: var(--text-secondary);
+    stroke-dasharray: 2, 2;
+}
+
+.node-icon {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    fill: var(--text-primary);
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+}
+
+.node-text {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    fill: var(--text-secondary);
+    text-anchor: middle;
+}
+
+.node-subtext {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: #64748b;
+    text-anchor: middle;
+}
+
+.traffic-dot {
+    fill: var(--accent-success);
+    filter: drop-shadow(0 0 4px var(--accent-success));
+}
+
+/* Logs Console */
+.console-window {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    height: 300px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Safety Card */
+.safety-card {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    height: auto;
+    overflow-y: hidden;
+}
+
+.safety-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #F59E0B;
+    margin-bottom: 8px;
+}
+
+.safety-card ul {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+/* Table Enhancements */
+.phantun-table th {
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.phantun-table td {
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+/* SVG Icons for Buttons */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+}
+
+.icon-btn svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Dashboard Topology Container */
+.topology-container {
+    width: 100%;
+    min-height: 150px;
+    background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
