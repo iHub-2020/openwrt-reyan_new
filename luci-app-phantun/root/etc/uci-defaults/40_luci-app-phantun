@@ -10,7 +10,7 @@ if [ ! -f /etc/config/phantun ]; then
 fi
 
 # 2. Register ucitrack
-uci -q batch <<-EOF >/dev/null
+uci -q batch <<EOF >/dev/null
 	delete ucitrack.@phantun[-1]
 	add ucitrack phantun
 	set ucitrack.@phantun[-1].init=phantun
@@ -19,7 +19,7 @@ EOF
 
 # 3. Reload rpcd for ACLs
 if [ -x /etc/init.d/rpcd ]; then
-    /etc/init.d/rpcd reload 2>/dev/null || true
+	/etc/init.d/rpcd reload 2>/dev/null || true
 fi
 
 # 4. Clear LuCI Cache (Safe Mode)
