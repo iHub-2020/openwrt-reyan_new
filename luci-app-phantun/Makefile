@@ -29,6 +29,14 @@ define Package/luci-app-phantun/description
   instances with TUN interface management and automatic iptables rules.
 endef
 
+define Package/luci-app-phantun/prerm
+#!/bin/sh
+# Gracefully stop service/remove ubus objects before removal
+/etc/init.d/phantun stop >/dev/null 2>&1 || true
+/etc/init.d/phantun disable >/dev/null 2>&1 || true
+exit 0
+endef
+
 # 核心：引入 luci.mk，它会自动处理 po/zh_Hans/luci-app-phantun.po
 include $(TOPDIR)/feeds/luci/luci.mk
 
