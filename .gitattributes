@@ -1,5 +1,1 @@
-# Force Unix line endings for shell scripts
-*.sh text eol=lf
-luci-app-phantun/root/usr/share/etc/uci-defaults/* text eol=lf
-phantun/files/phantun.init text eol=lf
-phantun/files/phantun.init text eol=lf
+luci-app-lucky luci-app-phantun luci-app-poweroffdevice luci-app-udp-speeder luci-app-udp-tunnel phantun udp2raw udpspeeder text=auto eol=lf
