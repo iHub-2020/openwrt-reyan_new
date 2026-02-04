@@ -667,32 +667,33 @@ return view.extend({
         s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns
+        // Table Columns (Server)
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '13%';
+        o.width = '5%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
-        o.modalonly = true;
+        o.width = '20%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '17%';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '10.10.10.1';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '25%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '15%';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
@@ -808,22 +809,23 @@ return view.extend({
         s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns
+        // Table Columns (Client)
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '13%';
+        o.width = '5%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyClient';
         o.rmempty = true;
-        o.modalonly = true;
+        o.width = '20%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
         o.placeholder = '10.10.10.1';
         o.rmempty = false;
-        o.width = '17%';
+        o.width = '25%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
@@ -833,7 +835,7 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'local_port', _('Local Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '15%';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),
