@@ -10,10 +10,11 @@ EOF
 if [ ! -f /etc/config/phantun ]; then
 	touch /etc/config/phantun
 	chmod 644 /etc/config/phantun
-	uci set phantun.general=global
+	uci set phantun.general=general
 	uci set phantun.general.enabled='0'
 	uci commit phantun
 fi
+
 
 rm -f /tmp/luci-indexcache
 exit 0
