@@ -29,16 +29,33 @@ define Package/luci-app-phantun/description
   instances with TUN interface management and automatic iptables rules.
 endef
 
-define Package/luci-app-phantun/prerm
+# Post-install script: Ensure permissions and enable service
+define Package/luci-app-phantun/postinst
 #!/bin/sh
-# Gracefully stop service/remove ubus objects before removal
-/etc/init.d/phantun stop >/dev/null 2>&1 || true
-/etc/init.d/phantun disable >/dev/null 2>&1 || true
+if [ -z "$${IPKG_INSTROOT}" ]; then
+	chmod 755 /etc/init.d/phantun
+	/etc/init.d/phantun enable
+	/etc/init.d/phantun start
+	rm -f /tmp/luci-indexcache
+	rm -rf /tmp/luci-modulecache/
+fi
 exit 0
 endef
 
-# 核心：引入 luci.mk，它会自动处理 po/zh_Hans/luci-app-phantun.po
+define Package/luci-app-phantun/prerm
+#!/bin/sh
+# Stop service before removal
+if [ -z "$${IPKG_INSTROOT}" ]; then
+	/etc/init.d/phantun stop >/dev/null 2>&1
+	/etc/init.d/phantun disable >/dev/null 2>&1
+fi
+exit 0
+endef
+
 include $(TOPDIR)/feeds/luci/luci.mk
 
-# 最后一行调用构建逻辑
-$(eval $(call BuildPackage,luci-app-phantun))
+# Call BuildPackage - OpenWrt buildroot signature
+# $(eval $(call BuildPackage,luci-app-phantun))
+# Modern luci.mk handles the build call automatically. Checks indicate luci-app-lucky ends at include luci.mk.
+
+
