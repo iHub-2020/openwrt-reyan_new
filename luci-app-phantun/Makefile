@@ -30,27 +30,10 @@ define Package/luci-app-phantun/description
 endef
 
 # Post-install script: Ensure permissions and enable service
-define Package/luci-app-phantun/postinst
-#!/bin/sh
-if [ -z "$${IPKG_INSTROOT}" ]; then
-	chmod 755 /etc/init.d/phantun
-	/etc/init.d/phantun enable
-	/etc/init.d/phantun start
-	rm -f /tmp/luci-indexcache
-	rm -rf /tmp/luci-modulecache/
-fi
-exit 0
-endef
+# Post-install/Prerm logic removed.
+# 1. Init script permissions managed by phantun core package.
+# 2. Service enablement managed by ucitrack/uci-defaults.
 
-define Package/luci-app-phantun/prerm
-#!/bin/sh
-# Stop service before removal
-if [ -z "$${IPKG_INSTROOT}" ]; then
-	/etc/init.d/phantun stop >/dev/null 2>&1
-	/etc/init.d/phantun disable >/dev/null 2>&1
-fi
-exit 0
-endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
