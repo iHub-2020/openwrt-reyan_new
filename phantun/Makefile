@@ -149,9 +149,14 @@ define Package/phantun/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/phantun_client $(1)/usr/bin/phantun_client
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/phantun_server $(1)/usr/bin/phantun_server
 	
+	# Init Script (Service Management)
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/phantun.init $(1)/etc/init.d/phantun
+
 	# Sysupgrade config preservation (Optional, generally config belongs to luci-app-phantun)
 	$(INSTALL_DIR) $(1)/usr/share/phantun
 	$(INSTALL_DATA) ./files/phantun.upgrade $(1)/usr/share/phantun/
+
 endef
 
 define Package/phantun/conffiles
