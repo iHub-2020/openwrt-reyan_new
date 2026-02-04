@@ -84,6 +84,24 @@ msgstr "调试"
 msgid "Trace (Very Verbose)"
 msgstr "追踪（非常详细）"
 
+msgid "Keep Firewall Rules"
+msgstr "保持防火墙规则"
+
+msgid "Automatically restore iptables rules if they are cleared by the system (firewall reload). Recommended."
+msgstr "如果防火墙规则被系统（如防火墙重启）清除，自动恢复这些规则。推荐启用。"
+
+msgid "Wait for Iptables Lock"
+msgstr "等待 Iptables 锁"
+
+msgid "Use the -w flag when invoking iptables to avoid failures during concurrent operations."
+msgstr "调用 iptables 时使用 -w 标志，以避免并发操作失败。"
+
+msgid "Retry on Error"
+msgstr "出错时重试"
+
+msgid "Automatically restart the service if it crash or exits unexpectedly."
+msgstr "如果服务崩溃或意外退出，自动重启服务。"
+
 # iptables status messages
 msgid "Active (Rules Detected)"
 msgstr "激活（检测到规则）"

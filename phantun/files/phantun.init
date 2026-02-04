@@ -27,6 +27,21 @@ CLIENT_PROG=/usr/bin/phantun_client
 SERVER_PROG=/usr/bin/phantun_server
 CONFIG_FILE=/etc/config/phantun
 
+# Default iptables command (overridden by config)
+IPT="iptables"
+IP6T="ip6tables"
+
+load_global_settings() {
+	local wait_lock
+	config_load phantun
+	config_get_bool wait_lock general wait_lock 0
+	
+	if [ "$wait_lock" -eq 1 ]; then
+		IPT="iptables -w"
+		IP6T="ip6tables -w"
+	fi
+}
+
 # Validate required parameters for client
 validate_client_section() {
 	local section="$1"
@@ -80,15 +95,15 @@ setup_client_iptables() {
 	
 	# IPv4 MASQUERADE rule
 	if [ -n "$tun_peer" ]; then
-		iptables -t nat -C POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
-		iptables -t nat -A POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE
+		$IPT -t nat -C POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
+		$IPT -t nat -A POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE
 		logger -t phantun -p daemon.info "Added IPv4 MASQUERADE rule for $tun_peer"
 	fi
 	
 	# IPv6 MASQUERADE rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ]; then
-		ip6tables -t nat -C POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
-		ip6tables -t nat -A POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE
+		$IP6T -t nat -C POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null || \
+		$IP6T -t nat -A POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE
 		logger -t phantun -p daemon.info "Added IPv6 MASQUERADE rule for $tun_peer6"
 	fi
 }
@@ -102,15 +117,15 @@ setup_server_iptables() {
 	
 	# IPv4 DNAT rule
 	if [ -n "$tun_peer" ] && [ -n "$local_port" ]; then
-		iptables -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null || \
-		iptables -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port"
+		$IPT -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null || \
+		$IPT -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port"
 		logger -t phantun -p daemon.info "Added IPv4 DNAT rule: port $local_port -> $tun_peer:$local_port"
 	fi
 	
 	# IPv6 DNAT rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ] && [ -n "$local_port" ]; then
-		ip6tables -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null || \
-		ip6tables -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port"
+		$IP6T -t nat -C PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null || \
+		$IP6T -t nat -A PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port"
 		logger -t phantun -p daemon.info "Added IPv6 DNAT rule: port $local_port -> [$tun_peer6]:$local_port"
 	fi
 }
@@ -127,13 +142,13 @@ cleanup_client_iptables() {
 	
 	# Remove IPv4 MASQUERADE rule (Exact match with comment)
 	if [ -n "$tun_peer" ]; then
-		iptables -t nat -D POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
+		$IPT -t nat -D POSTROUTING -s "$tun_peer/32" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv4 MASQUERADE rule for $tun_peer"
 	fi
 	
 	# Remove IPv6 MASQUERADE rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ]; then
-		ip6tables -t nat -D POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
+		$IP6T -t nat -D POSTROUTING -s "$tun_peer6/128" -m comment --comment "phantun" -j MASQUERADE 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv6 MASQUERADE rule for $tun_peer6"
 	fi
 }
@@ -150,13 +165,13 @@ cleanup_server_iptables() {
 	
 	# Remove IPv4 DNAT rule
 	if [ -n "$tun_peer" ] && [ -n "$local_port" ]; then
-		iptables -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null
+		$IPT -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "$tun_peer:$local_port" 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv4 DNAT rule: port $local_port -> $tun_peer:$local_port"
 	fi
 	
 	# Remove IPv6 DNAT rule
 	if [ "$ipv4_only" != "1" ] && [ -n "$tun_peer6" ] && [ -n "$local_port" ]; then
-		ip6tables -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null
+		$IP6T -t nat -D PREROUTING -p tcp --dport "$local_port" -m comment --comment "phantun" -j DNAT --to-destination "[$tun_peer6]:$local_port" 2>/dev/null
 		logger -t phantun -p daemon.info "Removed IPv6 DNAT rule: port $local_port -> [$tun_peer6]:$local_port"
 	fi
 }
@@ -217,7 +232,13 @@ start_client() {
 	[ -n "$handshake_packet" ] && [ -f "$handshake_packet" ] && \
 		procd_append_param command --handshake-packet "$handshake_packet"
 	
-	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+	# Retry/Respawn Logic (Global setting)
+	local retry_on_error
+	config_get_bool retry_on_error general retry_on_error 0
+	
+	if [ "$retry_on_error" -eq 1 ]; then
+		procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+	fi
 	procd_set_param stderr 1
 	procd_set_param stdout 1
 	procd_set_param pidfile "/var/run/phantun_client_${section}.pid"
@@ -282,7 +303,13 @@ start_server() {
 	[ -n "$handshake_packet" ] && [ -f "$handshake_packet" ] && \
 		procd_append_param command --handshake-packet "$handshake_packet"
 	
-	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+	# Retry/Respawn Logic (Global setting)
+	local retry_on_error
+	config_get_bool retry_on_error general retry_on_error 0
+	
+	if [ "$retry_on_error" -eq 1 ]; then
+		procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+	fi
 	procd_set_param stderr 1
 	procd_set_param stdout 1
 	procd_set_param pidfile "/var/run/phantun_server_${section}.pid"
@@ -308,6 +335,8 @@ start_service() {
 		return 0
 	fi
 	
+	load_global_settings
+	
 	# Start all enabled clients and servers
 	config_foreach start_client client
 	config_foreach start_server server
@@ -327,25 +356,35 @@ stop_service() {
     
     # Brute Force Cleanup: Remove ANY remaining rules tagged with 'phantun' comment
     # This handles case where config sections were deleted before stop was called
-    iptables-save -t nat | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
-        iptables -t nat $rule 2>/dev/null
+    $IPT -t nat -S | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
+        $IPT -t nat $rule 2>/dev/null
     done
     
-    ip6tables-save -t nat | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
-        ip6tables -t nat $rule 2>/dev/null
+    $IP6T -t nat -S | grep "comment phantun" | sed 's/-A/-D/' | while read rule; do 
+        $IP6T -t nat $rule 2>/dev/null
     done
 
     # Fallback Cleanup for legacy rules (without comments) and default subnets
     # This fixes the "Ghost Rules" issue for existing users
+
     for ip in 192.168.200 192.168.201; do
-        iptables -t nat -S | grep "$ip" | grep -v "comment" | sed 's/-A/-D/' | while read rule; do
-            iptables -t nat $rule 2>/dev/null
+        $IPT -t nat -S | grep "$ip" | grep -v "comment" | sed 's/-A/-D/' | while read rule; do
+            $IPT -t nat $rule 2>/dev/null
         done
     done
 }
 
 service_triggers() {
 	procd_add_reload_trigger "phantun"
+    
+    # Optional: Keep Firewall Rules (Reload Phantun when firewall restarts)
+	config_load phantun
+	local keep_rule
+	config_get keep_rule general keep_rule '0'
+	
+	if [ "$keep_rule" = "1" ]; then
+		procd_add_reload_trigger "firewall"
+	fi
 }
 
 reload_service() {

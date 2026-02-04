@@ -594,6 +594,18 @@ return view.extend({
         o.value('trace', _('Trace (Very Verbose)'));
         o.default = 'info';
 
+        o = s.option(form.Flag, 'keep_rule', _('Keep Firewall Rules'),
+            _('Automatically restore iptables rules if they are cleared by the system (firewall reload). Recommended.'));
+        o.default = '0';
+
+        o = s.option(form.Flag, 'wait_lock', _('Wait for Iptables Lock'),
+            _('Use the -w flag when invoking iptables to avoid failures during concurrent operations.'));
+        o.default = '0';
+
+        o = s.option(form.Flag, 'retry_on_error', _('Retry on Error'),
+            _('Automatically restart the service if it crash or exits unexpectedly.'));
+        o.default = '0';
+
 
 
         // ==================== Server Instances ====================
