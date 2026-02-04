@@ -253,6 +253,9 @@ msgstr "服务器端口"
 msgid "Local Port"
 msgstr "本地端口"
 
+msgid "Local Listen Port"
+msgstr "本地监听端口"
+
 msgid "Local UDP Address"
 msgstr "本地 UDP 地址"
 
