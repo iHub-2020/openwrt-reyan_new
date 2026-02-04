@@ -910,6 +910,18 @@ return view.extend({
             });
         };
 
-        return m.render();
+        return m.render().then(function (nodes) {
+            // Inject custom CSS to enforce table column alignment
+            // Order: [Name, Enable, Alias, Local Port, Remote IP, Remote Port]
+            nodes.appendChild(E('style', { 'type': 'text/css' }, [
+                '.cbi-section-table .th:nth-of-type(1), .cbi-section-table .td:nth-of-type(1) { width: 15% !important; min-width: 120px; }', // Name
+                '.cbi-section-table .th:nth-of-type(2), .cbi-section-table .td:nth-of-type(2) { width: 5% !important;  min-width: 50px; }',  // Enable
+                '.cbi-section-table .th:nth-of-type(3), .cbi-section-table .td:nth-of-type(3) { width: 15% !important; }', // Alias
+                '.cbi-section-table .th:nth-of-type(4), .cbi-section-table .td:nth-of-type(4) { width: 15% !important; }', // Local Port
+                '.cbi-section-table .th:nth-of-type(5), .cbi-section-table .td:nth-of-type(5) { width: 25% !important; }', // Remote Addr
+                '.cbi-section-table .th:nth-of-type(6), .cbi-section-table .td:nth-of-type(6) { width: 15% !important; }'  // Remote Port
+            ]));
+            return nodes;
+        });
     }
 });
