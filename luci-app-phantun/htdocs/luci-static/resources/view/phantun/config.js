@@ -677,7 +677,7 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
-        o.width = '20%';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
@@ -808,8 +808,8 @@ return view.extend({
         s.tab('basic', _('Basic Settings'));
         s.tab('advanced', _('Advanced Settings'));
 
-        // Table Columns
         // Table Columns (Client)
+        // ALIGNMENT: Match Server table structure (Local -> Remote)
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
@@ -819,7 +819,12 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyClient';
         o.rmempty = true;
-        o.width = '20%';
+        o.width = '15%';
+
+        o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
+        o.datatype = 'port';
+        o.rmempty = false;
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
@@ -828,11 +833,6 @@ return view.extend({
         o.width = '25%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
-        o.datatype = 'port';
-        o.rmempty = false;
-        o.width = '15%';
-
-        o = s.taboption('basic', form.Value, 'local_port', _('Local Port'));
         o.datatype = 'port';
         o.rmempty = false;
         o.width = '15%';
