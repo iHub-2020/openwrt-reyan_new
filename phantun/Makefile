@@ -149,40 +149,15 @@ define Package/phantun/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/phantun_client $(1)/usr/bin/phantun_client
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/phantun_server $(1)/usr/bin/phantun_server
 	
-	# Default config
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/phantun.config $(1)/etc/config/phantun
-	
-	# Init script
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/phantun.init $(1)/etc/init.d/phantun
-	
-	# Sysupgrade config preservation
+	# Sysupgrade config preservation (Optional, generally config belongs to luci-app-phantun)
 	$(INSTALL_DIR) $(1)/usr/share/phantun
 	$(INSTALL_DATA) ./files/phantun.upgrade $(1)/usr/share/phantun/
 endef
 
 define Package/phantun/conffiles
-/etc/config/phantun
 endef
 
-define Package/phantun/postinst
-#!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
-	echo "Enabling phantun service..."
-	/etc/init.d/phantun enable 2>/dev/null || true
-}
-exit 0
-endef
+# Remove postinst/prerm as service is managed by luci-app-phantun
 
-define Package/phantun/prerm
-#!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
-	echo "Stopping phantun service..."
-	/etc/init.d/phantun stop 2>/dev/null || true
-	/etc/init.d/phantun disable 2>/dev/null || true
-}
-exit 0
-endef
 
 $(eval $(call BuildPackage,phantun))
