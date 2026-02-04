@@ -1,0 +1,19 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@phantun[-1]
+	add ucitrack phantun
+	set ucitrack.@phantun[-1].init=phantun
+	commit ucitrack
+EOF
+
+if [ ! -f /etc/config/phantun ]; then
+	touch /etc/config/phantun
+	chmod 644 /etc/config/phantun
+	uci set phantun.general=global
+	uci set phantun.general.enabled='0'
+	uci commit phantun
+fi
+
+rm -f /tmp/luci-indexcache
+exit 0
