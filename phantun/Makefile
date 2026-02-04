@@ -26,7 +26,10 @@ PKG_NAME:=phantun
 # 从 v1.0.2 开始（phantun当前最新版本）
 # ----------------------------------------------------------------------------
 # 动态获取最新版本，如果获取失败则使用默认版本
-PKG_VERSION:=$(shell curl -s --connect-timeout 10 https://api.github.com/repos/iHub-2020/phantun/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' || echo "1.0.2")
+# Dynamic version fetching causes CI failures (Rate limits/Network issues). 
+# Switched to static version for stability.
+PKG_VERSION:=1.0.2
+# PKG_VERSION:=$(shell curl -s --connect-timeout 10 https://api.github.com/repos/iHub-2020/phantun/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^v//' || echo "1.0.2")
 PKG_RELEASE:=1
 
 # ============================================================
