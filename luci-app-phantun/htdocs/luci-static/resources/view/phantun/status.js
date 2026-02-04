@@ -365,6 +365,11 @@ return view.extend({
         ]);
     },
 
+    // Wrapper for polling
+    fetchStatusData: function () {
+        return this.load();
+    },
+
     render: function (data) {
         var self = this;
         var serviceStatus = data[0];
@@ -385,7 +390,7 @@ return view.extend({
             E('div', { 'class': 'cbi-section' }, [
                 E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
                     E('div', { 'style': 'width: 150px; font-weight: bold;' }, _('Service Status:')),
-                    E('div', { 'style': 'font-weight: bold; color: ' + statusColor + ';' },
+                    E('div', { 'id': 'service-status-text', 'style': 'font-weight: bold; color: ' + statusColor + ';' },
                         statusText + (instanceCount > 0 ? ' (' + instanceCount + ' instances)' : ''))
                 ])
             ]),
@@ -393,7 +398,7 @@ return view.extend({
             // ==================== Tunnel Status Table ====================
             E('div', { 'class': 'cbi-section', 'style': 'margin-top: 20px;' }, [
                 E('h3', {}, _('Tunnel Status')),
-                E('table', { 'class': 'table cbi-section-table' }, [
+                E('table', { 'class': 'table cbi-section-table', 'id': 'tunnel-status-table' }, [
                     E('tr', { 'class': 'tr table-titles' }, [
                         E('th', { 'class': 'th' }, _('Name')),
                         E('th', { 'class': 'th' }, _('Mode')),
@@ -404,28 +409,7 @@ return view.extend({
                         E('th', { 'class': 'th' }, _('PID'))
                     ])
                 ].concat(
-                    tunnels.length > 0 ? tunnels.map(function (t) {
-                        var instanceKey = t.mode + '_' + t.id;  // Match init script format: client_cfg123 or server_cfg456
-                        var instance = serviceStatus.instances[instanceKey];
-                        var isActive = instance && instance.pid;
-                        var rowColor = t.disabled ? '#888' : (isActive ? '#5cb85c' : '#d9534f');
-                        var statusIcon = t.disabled ? '⏸' : (isActive ? '✓' : '✗');
-                        var statusLabel = t.disabled ? _('Disabled') : (isActive ? _('Running') : _('Stopped'));
-
-                        return E('tr', { 'class': 'tr' }, [
-                            E('td', { 'class': 'td' }, t.alias),
-                            E('td', { 'class': 'td' }, t.mode === 'server' ? _('Server') : _('Client')),
-                            E('td', { 'class': 'td' }, E('span', { 'style': 'color: ' + rowColor + '; font-weight: bold;' }, statusIcon + ' ' + statusLabel)),
-                            E('td', { 'class': 'td' }, t.local),
-                            E('td', { 'class': 'td' }, t.remote),
-                            E('td', { 'class': 'td' }, t.tun_local + ' ↔ ' + t.tun_peer),
-                            E('td', { 'class': 'td' }, isActive ? String(instance.pid) : '-')
-                        ]);
-                    }) : [
-                        E('tr', { 'class': 'tr' }, [
-                            E('td', { 'class': 'td', 'colspan': '7', 'style': 'text-align: center; color: #888;' }, _('No tunnels configured'))
-                        ])
-                    ]
+                    self.renderTunnelRows(tunnels, serviceStatus)
                 ))
             ]),
 
@@ -434,7 +418,7 @@ return view.extend({
                 E('h3', {}, _('System Diagnostics')),
                 E('div', { 'style': 'display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 10px 0;' }, [
                     E('div', { 'style': 'font-weight: bold;' }, _('Core Binary:')),
-                    E('div', {}, md5s.error ?
+                    E('div', { 'id': 'diag-binary' }, md5s.error ?
                         E('span', { 'style': 'color: #d9534f;' }, '❌ ' + md5s.error) :
                         E('span', { 'style': 'color: #5cb85c;' }, '✓ Verified (' +
                             (md5s.phantun_client ? 'Client: ' + md5s.phantun_client.substring(0, 8) + '... ' : '') +
@@ -442,7 +426,7 @@ return view.extend({
                     ),
 
                     E('div', { 'style': 'font-weight: bold;' }, _('TUN Interfaces:')),
-                    E('div', {}, tunInterfaces && tunInterfaces.length > 0 ?
+                    E('div', { 'id': 'diag-tun' }, tunInterfaces && tunInterfaces.length > 0 ?
                         tunInterfaces.map(function (iface) {
                             var stateColor = iface.state === 'UP' ? '#5cb85c' : '#d9534f';
                             return E('div', {}, [
@@ -456,7 +440,7 @@ return view.extend({
                     ),
 
                     E('div', { 'style': 'font-weight: bold;' }, _('iptables Rules:')),
-                    E('div', {},
+                    E('div', { 'id': 'diag-iptables' },
                         E('span', { 'style': 'color: ' + iptablesRules.color + ';' }, iptablesRules.text)
                     )
                 ])
@@ -570,10 +554,9 @@ return view.extend({
                 poll.add(self.logPollFn, self.pollInterval);
             }
 
-            // CRITICAL: Add status auto-refresh (not just logs)
+            // Add status auto-refresh (not just logs)
             poll.add(function () {
                 return self.fetchStatusData().then(function (newData) {
-                    // Find the container element dynamically
                     var statusContainer = document.querySelector('.cbi-map');
                     if (statusContainer) {
                         self.updateStatusView(statusContainer, newData);
@@ -583,6 +566,93 @@ return view.extend({
         });
 
         return container;
+    },
+
+    // Helper to render tunnel rows (shared between render and update)
+    renderTunnelRows: function (tunnels, serviceStatus) {
+        return tunnels.length > 0 ? tunnels.map(function (t) {
+            var instanceKey = t.mode + '_' + t.id;  // Match init script format: client_cfg123 or server_cfg456
+            var instance = serviceStatus.instances[instanceKey];
+            var isActive = instance && instance.pid;
+            var rowColor = t.disabled ? '#888' : (isActive ? '#5cb85c' : '#d9534f');
+            var statusIcon = t.disabled ? '⏸' : (isActive ? '✓' : '✗');
+            var statusLabel = t.disabled ? _('Disabled') : (isActive ? _('Running') : _('Stopped'));
+
+            return E('tr', { 'class': 'tr' }, [
+                E('td', { 'class': 'td' }, t.alias),
+                E('td', { 'class': 'td' }, t.mode === 'server' ? _('Server') : _('Client')),
+                E('td', { 'class': 'td' }, E('span', { 'style': 'color: ' + rowColor + '; font-weight: bold;' }, statusIcon + ' ' + statusLabel)),
+                E('td', { 'class': 'td' }, t.local),
+                E('td', { 'class': 'td' }, t.remote),
+                E('td', { 'class': 'td' }, t.tun_local + ' ↔ ' + t.tun_peer),
+                E('td', { 'class': 'td' }, isActive ? String(instance.pid) : '-')
+            ]);
+        }) : [
+            E('tr', { 'class': 'tr' }, [
+                E('td', { 'class': 'td', 'colspan': '7', 'style': 'text-align: center; color: #888;' }, _('No tunnels configured'))
+            ])
+        ];
+    },
+
+    // Update the view without destroying selection
+    updateStatusView: function (container, data) {
+        var self = this;
+        var serviceStatus = data[0];
+        var tunnels = data[1];
+        // data[2] (logs) handled by separate poller
+        var md5s = data[3];
+        var iptablesRules = data[4];
+        var tunInterfaces = data[5];
+
+        // 1. Update Service Status Text
+        var statusColor = serviceStatus.running ? '#5cb85c' : '#d9534f';
+        var statusText = serviceStatus.running ? _('Running') : _('Stopped');
+        var instanceCount = Object.keys(serviceStatus.instances).length;
+
+        var statusEl = container.querySelector('#service-status-text');
+        if (statusEl) {
+            statusEl.style.color = statusColor;
+            statusEl.textContent = statusText + (instanceCount > 0 ? ' (' + instanceCount + ' instances)' : '');
+        }
+
+        // 2. Update Tunnel Table
+        var tableEl = container.querySelector('#tunnel-status-table');
+        if (tableEl) {
+            // Remove old rows (except header)
+            var rows = tableEl.querySelectorAll('.tr:not(.table-titles)');
+            rows.forEach(function (r) { r.parentNode.removeChild(r); });
+
+            // Render new rows
+            var newRows = self.renderTunnelRows(tunnels, serviceStatus);
+            newRows.forEach(function (r) { tableEl.appendChild(r); });
+        }
+
+        // 3. Update Diagnostics
+        // TUN
+        var tunEl = container.querySelector('#diag-tun');
+        if (tunEl) {
+            tunEl.innerHTML = '';
+            if (tunInterfaces && tunInterfaces.length > 0) {
+                tunInterfaces.forEach(function (iface) {
+                    var stateColor = iface.state === 'UP' ? '#5cb85c' : '#d9534f';
+                    tunEl.appendChild(E('div', {}, [
+                        E('span', { 'style': 'color: ' + stateColor + '; font-weight: bold;' }, iface.name + ': ' + iface.state),
+                        E('span', { 'style': 'margin-left: 10px; color: #888;' },
+                            (iface.ipv4.length > 0 ? iface.ipv4.join(', ') : '') +
+                            (iface.ipv6.length > 0 ? ' / ' + iface.ipv6.join(', ') : ''))
+                    ]));
+                });
+            } else {
+                tunEl.appendChild(E('span', { 'style': 'color: #888;' }, _('None')));
+            }
+        }
+
+        // Iptables
+        var iptEl = container.querySelector('#diag-iptables');
+        if (iptEl) {
+            iptEl.innerHTML = '';
+            iptEl.appendChild(E('span', { 'style': 'color: ' + iptablesRules.color + ';' }, iptablesRules.text));
+        }
     },
 
     pollLogs: function () {
