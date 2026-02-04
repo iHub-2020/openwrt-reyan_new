@@ -168,36 +168,14 @@ return view.extend({
 
                     // Reset general section to defaults
                     var generalSections = uci.sections('phantun', 'general');
-                    var generalSection;
-
                     if (generalSections.length > 0) {
-                        generalSection = generalSections[0]['.name'];
-                        // Ensure it is named 'general' if it isn't (though usually typed section 'general' named 'settings')
-                        // But init script looks for section named 'general'.
-                        // If our existing section is named "settings", init script WON'T FIND IT.
-                        // So we MUST rename it to "general" if it exists but has wrong name.
-                        if (generalSection !== 'general') {
-                            uci.rename('phantun', generalSection, 'general');
-                            generalSection = 'general';
-                        }
-                    } else {
-                        // Create named section 'general'
-                        var sid = uci.add('phantun', 'general');
-                        uci.rename('phantun', sid, 'general');
-                        generalSection = 'general';
+                        var generalSection = generalSections[0]['.name'];
+                        uci.set('phantun', generalSection, 'enabled', '1');
+                        uci.set('phantun', generalSection, 'log_level', 'info');
                     }
 
-                    // Force service to be ENABLED so new instances can start immediately
-                    uci.set('phantun', generalSection, 'enabled', '1');
-                    uci.set('phantun', generalSection, 'log_level', 'info');
-
-                    // Explicitly commit changes to disk to ensure they persist before reload
-                    // uci.save() only stages changes in /tmp/.uci. 
-                    // Init script reads /etc/config/phantun directly, so we MUST commit.
-                    // This fixes the 'Cannot start after reset' bug.
-                    return uci.save().then(function () {
-                        return uci.commit('phantun');
-                    });
+                    // Save changes
+                    return uci.save();
                 }).then(function () {
                     ui.hideModal();
                     ui.addNotification(null, E('p', _('Configuration reset successfully')), 'info');
@@ -227,28 +205,13 @@ return view.extend({
                     resetBtn.textContent = '复位';
                     resetBtn.classList.add('cbi-button-negative');
 
-                    return true;
+                    return true;  // CRITICAL: Must return true when button found
                 }
-                return false;
+                return false;  // Return false when button not found
             };
 
-            // Apply immediately after render (Strictly following udp2raw)
-            requestAnimationFrame(function () {
-                var attempts = 0;
-                var maxAttempts = 30;
-
-                var tryApply = function () {
-                    if (applyButtonMods()) {
-                        // Success - now set up periodic check (but reduce frequency)
-                        setInterval(applyButtonMods, 1000);
-                    } else if (attempts < maxAttempts) {
-                        attempts++;
-                        requestAnimationFrame(tryApply);
-                    }
-                };
-
-                requestAnimationFrame(tryApply);
-            });
+            // Apply modifications after a short delay to ensure DOM is ready
+            setTimeout(applyButtonMods, 100);
 
             return mapEl;
         };

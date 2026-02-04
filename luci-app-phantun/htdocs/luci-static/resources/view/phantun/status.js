@@ -264,42 +264,14 @@ return view.extend({
             var dnatFound = false;
             var activeRules = false;
 
-            // Debugging: Log full iptables output to help user diagnose "No Rules" issue
-            if (lines.length > 0) {
-                console.log('Phantun Debug: iptables-save output (' + lines.length + ' lines):');
-                // console.log(lines.join('\n')); // Uncomment if needed, but might be too spammy. 
-                // Just log first few lines containing 'phantun'
-                lines.forEach(function (l) {
-                    if (l.indexOf('phantun') !== -1 || l.indexOf('192.168.20') !== -1) console.log('Iptables Match Candidate:', l);
-                });
-            } else {
-                console.warn('Phantun Debug: iptables-save returned EMPTY output!');
-            }
-
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
-
-                // Super Robust Check: Look for 'phantun' string anywhere
-                // This covers comments, and handles cases where 'comment' keyword might be formatted differently
-                if (line.indexOf('phantun') !== -1) {
-                    activeRules = true;
+                // Check if line contains relevant IP range AND is a rule (contains -A or -I, or implicitly from iptables-save format which doesn't always show -A for all lines but usually does, or starts with -A)
+                // iptables-save output: -A PREROUTING ...
+                if ((line.indexOf('192.168.200') !== -1 || line.indexOf('192.168.201') !== -1) && line.indexOf('-j') !== -1) {
                     if (line.indexOf('MASQUERADE') !== -1) masqueradeFound = true;
                     if (line.indexOf('DNAT') !== -1) dnatFound = true;
-                    continue;
-                }
-
-                // Legacy Check: Check if line contains relevant IP range
-                // Fix: Use Regex to handle Spaces in logs (e.g. "192. 168.")
-                var ipRegex = /192\. ?168\. ?20[01]/; // Matches 192.168.200 or 201 with optional spaces
-                if (ipRegex.test(line)) {
-                    if (line.indexOf('MASQUERADE') !== -1) {
-                        masqueradeFound = true;
-                        activeRules = true;
-                    }
-                    if (line.indexOf('DNAT') !== -1) {
-                        dnatFound = true;
-                        activeRules = true;
-                    }
+                    activeRules = true;
                 }
             }
 
@@ -406,7 +378,7 @@ return view.extend({
         var statusText = serviceStatus.running ? _('Running') : _('Stopped');
         var instanceCount = Object.keys(serviceStatus.instances).length;
 
-        var container = E('div', { 'class': 'cbi-map', 'id': 'phantun-status-view' }, [
+        var container = E('div', { 'class': 'cbi-map' }, [
             E('h2', {}, _('TCP Tunnel Status')),
 
             // ==================== Service Status (Compact) ====================
@@ -545,8 +517,10 @@ return view.extend({
                             // Immediately refresh display
                             self.pollLogs();
 
-                            // Show notification (removed per user request)
-                            // ui.addNotification(null, E('p', _('Logs cleared. Showing only new logs.')), 'info', 3);
+                            // Show notification
+                            ui.addNotification(null,
+                                E('p', _('Logs cleared. Showing only new logs.')),
+                                'info', 3);
                         }
                     }, _('Clear Logs')),
                     ' ',
@@ -597,7 +571,15 @@ return view.extend({
             }
 
             // CRITICAL: Add status auto-refresh (not just logs)
-            // Auto-refresh removed per user request to keep code clean
+            poll.add(function () {
+                return self.fetchStatusData().then(function (newData) {
+                    // Find the container element dynamically
+                    var statusContainer = document.querySelector('.cbi-map');
+                    if (statusContainer) {
+                        self.updateStatusView(statusContainer, newData);
+                    }
+                });
+            }, 5);  // Refresh status every 5 seconds
         });
 
         return container;
