@@ -940,6 +940,12 @@ return view.extend({
         };
 
         return m.render().then(function (nodes) {
+            // CSS to hide the redundant default "Name" column (first column)
+            // leaving our custom "_name" DummyValue as the visible first column.
+            nodes.appendChild(E('style', { 'type': 'text/css' }, [
+                '#cbi-phantun-server .cbi-section-table .th:first-child, #cbi-phantun-server .cbi-section-table .td:first-child { display: none !important; }',
+                '#cbi-phantun-client .cbi-section-table .th:first-child, #cbi-phantun-client .cbi-section-table .td:first-child { display: none !important; }'
+            ]));
             return nodes;
         });
     }
