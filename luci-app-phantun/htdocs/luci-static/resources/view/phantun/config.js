@@ -656,10 +656,7 @@ return view.extend({
             return el;
         };
 
-        s.sectiontitle = function (section_id) {
-            var alias = uci.get('phantun', section_id, 'alias');
-            return alias ? (alias + ' (Server)') : _('New Server');
-        };
+
 
         s.handleAdd = function (ev) {
             var section_id = uci.add('phantun', 'server');
@@ -807,10 +804,7 @@ return view.extend({
             return el;
         };
 
-        s.sectiontitle = function (section_id) {
-            var alias = uci.get('phantun', section_id, 'alias');
-            return alias ? (alias + ' (Client)') : _('New Client');
-        };
+
 
         s.handleAdd = function (ev) {
             var section_id = uci.add('phantun', 'client');
@@ -940,12 +934,6 @@ return view.extend({
         };
 
         return m.render().then(function (nodes) {
-            // CSS to hide the redundant default "Name" column (first column)
-            // leaving our custom "_name" DummyValue as the visible first column.
-            nodes.appendChild(E('style', { 'type': 'text/css' }, [
-                '#cbi-phantun-server .cbi-section-table .th:first-child, #cbi-phantun-server .cbi-section-table .td:first-child { display: none !important; }',
-                '#cbi-phantun-client .cbi-section-table .th:first-child, #cbi-phantun-client .cbi-section-table .td:first-child { display: none !important; }'
-            ]));
             return nodes;
         });
     }
