@@ -555,14 +555,14 @@ return view.extend({
             }
 
             // Add status auto-refresh (not just logs)
-            poll.add(function () {
-                return self.fetchStatusData().then(function (newData) {
+            poll.add(L.bind(function () {
+                return this.fetchStatusData().then(L.bind(function (newData) {
                     var statusContainer = document.querySelector('.cbi-map');
                     if (statusContainer) {
-                        self.updateStatusView(statusContainer, newData);
+                        this.updateStatusView(statusContainer, newData);
                     }
-                });
-            }, 5);  // Refresh status every 5 seconds
+                }, this));
+            }, self), 5);  // Refresh status every 5 seconds
         });
 
         return container;

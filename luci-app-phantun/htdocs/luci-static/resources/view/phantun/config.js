@@ -689,23 +689,23 @@ return view.extend({
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
-        o.width = '15%';
+        o.width = '10%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '10%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '10.10.10.1';
         o.rmempty = false;
-        o.width = '25%';
+        o.width = '20%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '10%';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
@@ -926,12 +926,12 @@ return view.extend({
             // Inject custom CSS to enforce table column alignment
             // Order: [Name, Enable, Alias, Local Port, Remote IP, Remote Port]
             nodes.appendChild(E('style', { 'type': 'text/css' }, [
-                '.cbi-section-table .th:nth-of-type(1), .cbi-section-table .td:nth-of-type(1) { width: 20% !important; min-width: 150px; }', // Name
-                '.cbi-section-table .th:nth-of-type(2), .cbi-section-table .td:nth-of-type(2) { width: 5% !important;  min-width: 50px; }',  // Enable
-                '.cbi-section-table .th:nth-of-type(3), .cbi-section-table .td:nth-of-type(3) { width: 15% !important; }', // Alias
-                '.cbi-section-table .th:nth-of-type(4), .cbi-section-table .td:nth-of-type(4) { width: 10% !important; }', // Local Port
-                '.cbi-section-table .th:nth-of-type(5), .cbi-section-table .td:nth-of-type(5) { width: 20% !important; }', // Remote Addr
-                '.cbi-section-table .th:nth-of-type(6), .cbi-section-table .td:nth-of-type(6) { width: 10% !important; }'  // Remote Port
+                '.cbi-section-table .th:nth-of-type(1), .cbi-section-table .td:nth-of-type(1) { width: 40% !important; min-width: 300px; }', // Name - DOUBLED
+                '.cbi-section-table .th:nth-of-type(2), .cbi-section-table .td:nth-of-type(2) { width: 2.5% !important; min-width: 25px; }', // Enable - HALVED
+                '.cbi-section-table .th:nth-of-type(3), .cbi-section-table .td:nth-of-type(3) { width: 10% !important; }', // Alias - adjusted
+                '.cbi-section-table .th:nth-of-type(4), .cbi-section-table .td:nth-of-type(4) { width: 10% !important; padding-left: 15px !important; }', // TCP Port - SHIFTED
+                '.cbi-section-table .th:nth-of-type(5), .cbi-section-table .td:nth-of-type(5) { width: 15% !important; padding-left: 15px !important; }', // Remote Addr - SHIFTED
+                '.cbi-section-table .th:nth-of-type(6), .cbi-section-table .td:nth-of-type(6) { width: 8% !important; padding-left: 15px !important; }'   // Remote Port - SHIFTED
             ]));
             return nodes;
         });
