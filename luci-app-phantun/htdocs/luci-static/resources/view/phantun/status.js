@@ -501,10 +501,7 @@ return view.extend({
                             // Immediately refresh display
                             self.pollLogs();
 
-                            // Show notification
-                            ui.addNotification(null,
-                                E('p', _('Logs cleared. Showing only new logs.')),
-                                'info', 3);
+
                         }
                     }, _('Clear Logs')),
                     ' ',
@@ -526,8 +523,8 @@ return view.extend({
                     E('button', {
                         'class': 'cbi-button cbi-button-neutral',
                         'click': function () {
-                            var textarea = document.getElementById('syslog-textarea');
-                            textarea.scrollTop = 0;
+                            var container = document.getElementById('syslog-container');
+                            if (container) container.scrollTop = 0;
                         }
                     }, _('Scroll to Top'))
                 ])

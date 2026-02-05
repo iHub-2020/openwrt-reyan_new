@@ -612,7 +612,7 @@ return view.extend({
         s = m.section(form.GridSection, 'server', _('Server Instances'),
             _('<b>Server Mode:</b> OpenWrt listens for TCP connections from Phantun clients and forwards to local UDP service.<br/>' +
                 'Traffic Flow: Remote Phantun Client → [TCP Obfuscated] → Phantun Server → Local UDP Service.'));
-        s.anonymous = false;
+        s.anonymous = true;
         s.addremove = true;
         s.sortable = true;
         s.nodescriptions = true;
@@ -678,34 +678,42 @@ return view.extend({
         s.tab('basic', _('Basic Settings'));
         s.tab('advanced', _('Advanced Settings'));
 
-        // Table Columns
         // Table Columns (Server)
+        o = s.taboption('basic', form.DummyValue, '_name', _('Name'));
+        o.modalonly = false;
+        o.rawhtml = true;
+        o.width = '150px';
+        o.cfgvalue = function (section_id) {
+            var alias = uci.get('phantun', section_id, 'alias');
+            return '<b>' + (alias ? alias : 'Server') + '</b><br/><small>' + section_id + '</small>';
+        };
+
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '5%';
+        o.width = '35px';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
-        o.width = '10%';
+        o.width = '140px';
 
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '135px';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '10.10.10.1';
         o.rmempty = false;
-        o.width = '20%';
+        o.width = '135px';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '10%';
+        o.width = '135px';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
@@ -755,7 +763,7 @@ return view.extend({
         s = m.section(form.GridSection, 'client', _('Client Instances'),
             _('<b>Client Mode:</b> OpenWrt listens for UDP locally and connects to a remote Phantun server.<br/>' +
                 'Traffic Flow: Local UDP App → Phantun Client → [TCP Obfuscated] → Remote Phantun Server → Remote UDP Service.'));
-        s.anonymous = false;
+        s.anonymous = true;
         s.addremove = true;
         s.sortable = true;
         s.nodescriptions = true;
@@ -821,33 +829,42 @@ return view.extend({
         s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns (Client)
-        // ALIGNMENT: Match Server table structure (Local -> Remote)
+        // ALIGNMENT: Match Server table structure        // Table Columns (Client)
+        o = s.taboption('basic', form.DummyValue, '_name', _('Name'));
+        o.modalonly = false;
+        o.rawhtml = true;
+        o.width = '150px';
+        o.cfgvalue = function (section_id) {
+            var alias = uci.get('phantun', section_id, 'alias');
+            return '<b>' + (alias ? alias : 'Client') + '</b><br/><small>' + section_id + '</small>';
+        };
+
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '5%';
+        o.width = '35px';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyClient';
         o.rmempty = true;
-        o.width = '15%';
+        o.width = '140px';
 
         o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '135px';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
-        o.placeholder = '10.10.10.1';
+        o.placeholder = 'Server IP/Domain';
         o.rmempty = false;
-        o.width = '25%';
+        o.width = '135px';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '15%';
+        o.width = '135px';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),
@@ -923,16 +940,6 @@ return view.extend({
         };
 
         return m.render().then(function (nodes) {
-            // Inject custom CSS to enforce table column alignment
-            // Order: [Name, Enable, Alias, Local Port, Remote IP, Remote Port]
-            nodes.appendChild(E('style', { 'type': 'text/css' }, [
-                '.cbi-section-table .th:nth-of-type(1), .cbi-section-table .td:nth-of-type(1) { width: 40% !important; min-width: 300px; }', // Name - DOUBLED
-                '.cbi-section-table .th:nth-of-type(2), .cbi-section-table .td:nth-of-type(2) { width: 2.5% !important; min-width: 25px; }', // Enable - HALVED
-                '.cbi-section-table .th:nth-of-type(3), .cbi-section-table .td:nth-of-type(3) { width: 10% !important; }', // Alias - adjusted
-                '.cbi-section-table .th:nth-of-type(4), .cbi-section-table .td:nth-of-type(4) { width: 10% !important; padding-left: 15px !important; }', // TCP Port - SHIFTED
-                '.cbi-section-table .th:nth-of-type(5), .cbi-section-table .td:nth-of-type(5) { width: 15% !important; padding-left: 15px !important; }', // Remote Addr - SHIFTED
-                '.cbi-section-table .th:nth-of-type(6), .cbi-section-table .td:nth-of-type(6) { width: 8% !important; padding-left: 15px !important; }'   // Remote Port - SHIFTED
-            ]));
             return nodes;
         });
     }
