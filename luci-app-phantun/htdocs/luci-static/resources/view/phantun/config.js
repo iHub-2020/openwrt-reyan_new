@@ -614,7 +614,7 @@ return view.extend({
                 'Traffic Flow: Remote Phantun Client → [TCP Obfuscated] → Phantun Server → Local UDP Service.'));
         s.anonymous = true;
         s.addremove = true;
-        s.sortable = true;
+        s.sortable = false;
         s.nodescriptions = true;
         s.addbtntitle = _('Add Server');
 
@@ -676,41 +676,46 @@ return view.extend({
         s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns (Server)
+
+        // 1. Name (Custom Column)
         o = s.taboption('basic', form.DummyValue, '_name', _('Name'));
         o.modalonly = false;
-        o.rawhtml = true;
-        o.width = '150px';
+        o.rawhtml = false;
+        o.width = '15%';
         o.cfgvalue = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');
-            return '<b>' + (alias ? alias : 'Server') + '</b><br/><small>' + section_id + '</small>';
+            // Display: "Alias (ID)" or just "ID"
+            return (alias ? alias : 'Server') + ' (' + section_id + ')';
         };
 
+
+
+        // 2. Enable
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '35px';
-        o.rmempty = false;
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyServer';
         o.rmempty = true;
-        o.width = '140px';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('TCP Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '12%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Forward To IP'));
         o.datatype = 'host';
         o.placeholder = '10.10.10.1';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '10%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Forward To Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '10%';
 
         // Advanced Settings
         o = s.taboption('advanced', form.Flag, 'ipv4_only', _('IPv4 Only'),
@@ -762,7 +767,7 @@ return view.extend({
                 'Traffic Flow: Local UDP App → Phantun Client → [TCP Obfuscated] → Remote Phantun Server → Remote UDP Service.'));
         s.anonymous = true;
         s.addremove = true;
-        s.sortable = true;
+        s.sortable = false;
         s.nodescriptions = true;
         s.addbtntitle = _('Add Client');
 
@@ -823,42 +828,45 @@ return view.extend({
         s.tab('advanced', _('Advanced Settings'));
 
         // Table Columns (Client)
-        // ALIGNMENT: Match Server table structure        // Table Columns (Client)
+        // ALIGNMENT: Match Server table structure
         o = s.taboption('basic', form.DummyValue, '_name', _('Name'));
         o.modalonly = false;
-        o.rawhtml = true;
-        o.width = '150px';
+        o.rawhtml = false;
+        o.width = '15%';
         o.cfgvalue = function (section_id) {
             var alias = uci.get('phantun', section_id, 'alias');
-            return '<b>' + (alias ? alias : 'Client') + '</b><br/><small>' + section_id + '</small>';
+            // Display: "Alias (ID)" or just "ID"
+            return (alias ? alias : 'Client') + ' (' + section_id + ')';
         };
+
+
 
         o = s.taboption('basic', form.Flag, 'enabled', _('Enable'));
         o.default = '1';
         o.editable = true;
-        o.width = '35px';
+        o.width = '15%';
         o.rmempty = false;
 
         o = s.taboption('basic', form.Value, 'alias', _('Alias'));
         o.placeholder = 'MyClient';
         o.rmempty = true;
-        o.width = '140px';
+        o.width = '15%';
 
         o = s.taboption('basic', form.Value, 'local_port', _('Local Listen Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '12%';
 
         o = s.taboption('basic', form.Value, 'remote_addr', _('Server Address'));
         o.datatype = 'host';
         o.placeholder = 'Server IP/Domain';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '10%';
 
         o = s.taboption('basic', form.Value, 'remote_port', _('Server Port'));
         o.datatype = 'port';
         o.rmempty = false;
-        o.width = '135px';
+        o.width = '10%';
 
         // Modal Only Options - Basic
         o = s.taboption('basic', form.Value, 'local_addr', _('Local UDP Address'),
