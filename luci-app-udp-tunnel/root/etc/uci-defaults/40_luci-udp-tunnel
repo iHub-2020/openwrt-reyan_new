@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Copyright (C) 2024 iHub-2020
+#
+# UCI defaults script for luci-app-udp-tunnel
+#
+# Version: 1.2.0
+# Last Updated: 2026-02-27
+
+# 1. Initialize /etc/config/udp2raw (if missing or empty)
+if [ ! -f /etc/config/udp2raw ] || [ ! -s /etc/config/udp2raw ]; then
+	touch /etc/config/udp2raw
+	chmod 644 /etc/config/udp2raw
+	uci set udp2raw.globals=globals
+	uci set udp2raw.globals.enabled='0'
+	uci commit udp2raw
+fi
+
+# 2. Reload rpcd so ACL entries take effect
+if [ -x /etc/init.d/rpcd ]; then
+	/etc/init.d/rpcd reload 2>/dev/null || true
+fi
+
+# 3. Clear LuCI cache
+rm -rf /tmp/luci-indexcache 2>/dev/null || true
+rm -rf /tmp/luci-modulecache 2>/dev/null || true
+
+exit 0
