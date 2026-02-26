@@ -1,0 +1,15 @@
+{
+    "admin/system/poweroffdevice": {
+        "title": "Power Off Device",
+        "order": 92,
+        "action": {
+            "type": "view",
+            "path": "poweroffdevice/index"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-poweroffdevice"
+            ]
+        }
+    }
+}

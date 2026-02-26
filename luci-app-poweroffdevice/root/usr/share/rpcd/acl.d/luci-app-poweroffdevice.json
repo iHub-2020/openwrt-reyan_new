@@ -1,11 +1,19 @@
 {
 	"luci-app-poweroffdevice": {
-		"description": "Grant UCI access for luci-app-poweroffdevice",
+		"description": "Grant access for luci-app-poweroffdevice",
 		"read": {
-			"uci": [ "poweroffdevice" ]
+			"file": {
+				"/sbin/poweroff": [
+					"exec"
+				]
+			}
 		},
 		"write": {
-			"uci": [ "poweroffdevice" ]
+			"file": {
+				"/sbin/poweroff": [
+					"exec"
+				]
+			}
 		}
 	}
 }
