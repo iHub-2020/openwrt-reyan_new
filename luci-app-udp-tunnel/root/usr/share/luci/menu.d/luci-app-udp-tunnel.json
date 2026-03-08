@@ -1,13 +1,17 @@
 {
 	"admin/services/udp2raw": {
-		"title": "UDP Tunnel Manager",
+		"title": "udp2raw Raw Socket Tunnel",
 		"order": 90,
 		"action": {
 			"type": "firstchild"
 		},
 		"depends": {
-			"acl": [ "luci-app-udp-tunnel" ],
-			"uci": { "udp2raw": true }
+			"acl": [
+				"luci-app-udp-tunnel"
+			],
+			"uci": {
+				"udp2raw": true
+			}
 		}
 	},
 	"admin/services/udp2raw/config": {
@@ -27,4 +31,3 @@
 		}
 	}
 }
-

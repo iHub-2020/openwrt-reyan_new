@@ -17,7 +17,7 @@ PKG_LICENSE:=MIT
 PKG_MAINTAINER:=iHub-2020
 
 # 这里的 Title 会显示在 make menuconfig 中
-LUCI_TITLE:=LuCI support for UDP Tunnel Manager
+LUCI_TITLE:=LuCI support for udp2raw Raw Socket Tunnel
 # 架构设置为 all，因为是脚本和网页，不涉及二进制编译
 LUCI_PKGARCH:=all
 # 依赖关系：确保安装了 udp2raw 和 luci 基础库
@@ -25,7 +25,7 @@ LUCI_DEPENDS:=+udp2raw +luci-base
 
 # 这一段描述是标准的 OpenWrt 包描述格式
 define Package/luci-app-udp-tunnel/description
-  UDP Tunnel Manager - Web interface for configuring udp2raw tunnels
+  udp2raw Raw Socket Tunnel - Web interface for configuring udp2raw tunnels
   with FakeTCP/UDP/ICMP modes.
 endef
 

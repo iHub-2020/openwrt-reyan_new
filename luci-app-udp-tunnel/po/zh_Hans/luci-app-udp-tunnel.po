@@ -1,17 +1,17 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-msgid "UDP Tunnel Manager"
-msgstr "UDP 隧道管理器"
+msgid "udp2raw Raw Socket Tunnel"
+msgstr "udp2raw 原始套接字隧道"
 
-msgid "UDP Tunnel Configuration"
-msgstr "UDP 隧道配置"
+msgid "udp2raw Configuration"
+msgstr "udp2raw 配置"
 
-msgid "UDP Tunnel Status"
-msgstr "UDP 隧道状态"
+msgid "udp2raw Status"
+msgstr "udp2raw 状态"
 
-msgid "UDP Tunnel Manager converts UDP traffic into encrypted FakeTCP/UDP/ICMP traffic using raw sockets. It helps bypass UDP firewalls. Please ensure \"Key\", \"Raw Mode\", \"Cipher Mode\", and \"Auth Mode\" match on both sides."
-msgstr "UDP 隧道管理器使用原始套接字将 UDP 流量转换为加密的 FakeTCP/UDP/ICMP 流量。这有助于绕过 UDP 防火墙。请确保两端的“密码”、“传输模式”、“加密模式”和“认证模式”完全一致。"
+msgid "udp2raw converts UDP traffic into encrypted FakeTCP/UDP/ICMP traffic using raw sockets. It helps bypass UDP firewalls. Please ensure \"Key\", \"Raw Mode\", \"Cipher Mode\", and \"Auth Mode\" match on both sides."
+msgstr "udp2raw 使用原始套接字将 UDP 流量转换为加密的 FakeTCP/UDP/ICMP 流量。这有助于绕过 UDP 防火墙。请确保两端的“密码”、“传输模式”、“加密模式”和“认证模式”完全一致。"
 
 msgid "General Settings"
 msgstr "常规设置"

@@ -1,6 +1,6 @@
 {
 	"admin/services/phantun": {
-		"title": "TCP Tunnel",
+		"title": "Phantun TCP Obfuscation",
 		"order": 60,
 		"action": {
 			"type": "firstchild"

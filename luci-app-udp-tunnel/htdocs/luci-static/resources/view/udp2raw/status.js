@@ -26,21 +26,21 @@ var callServiceList = rpc.declare({
 });
 
 return view.extend({
-	title: _('UDP Tunnel Status'),
+	title: _('udp2raw Status'),
 
 	pollInterval: 5,
 	logPollFn: null,
-	
-	cleanText: function(str) {
+
+	cleanText: function (str) {
 		if (!str) return '';
 		return String(str).replace(/\x1B[[0-9;]*[a-zA-Z]/g, '').trim();
 	},
 
-	getServiceStatus: function() {
-		return L.resolveDefault(callServiceList('udp2raw'), {}).then(function(res) {
+	getServiceStatus: function () {
+		return L.resolveDefault(callServiceList('udp2raw'), {}).then(function (res) {
 			var instances = {};
 			var isRunning = false;
-			
+
 			if (res && res.udp2raw && res.udp2raw.instances) {
 				for (var key in res.udp2raw.instances) {
 					var inst = res.udp2raw.instances[key];
@@ -57,12 +57,12 @@ return view.extend({
 		});
 	},
 
-	getTunnelConfigs: function() {
-		return uci.load('udp2raw').then(function() {
+	getTunnelConfigs: function () {
+		return uci.load('udp2raw').then(function () {
 			var tunnels = [];
 			var sections = uci.sections('udp2raw');
 
-			sections.forEach(function(s) {
+			sections.forEach(function (s) {
 				if (s['.type'] === 'general') return;
 
 				var mode = 'client';
@@ -71,7 +71,7 @@ return view.extend({
 
 				if (s['.type'] === 'server') {
 					mode = 'server';
-					var listenPort = s.listen_port || s.local_port || '29900'; 
+					var listenPort = s.listen_port || s.local_port || '29900';
 					var target = s.forward_to || s.target || s.target_addr || '127.0.0.1';
 					var targetPort = s.target_port || s.forward_port || '';
 					localStr = '0.0.0.0:' + listenPort;
@@ -89,7 +89,7 @@ return view.extend({
 				tunnels.push({
 					id: s['.name'],
 					alias: s.alias || s['.name'],
-					mode: mode, 
+					mode: mode,
 					disabled: s.enabled === '0' || s.disabled === '1',
 					local: localStr,
 					remote: remoteStr,
@@ -100,22 +100,22 @@ return view.extend({
 		});
 	},
 
-	getRecentLogs: function() {
+	getRecentLogs: function () {
 		var self = this;
-		return fs.exec('/sbin/logread', ['-e', 'udp2raw']).then(function(res) {
+		return fs.exec('/sbin/logread', ['-e', 'udp2raw']).then(function (res) {
 			var output = res.stdout || '';
 			if (!output && res.code !== 0) {
 				return fs.exec('/bin/sh', ['-c', 'logread | grep udp2raw | tail -n 150']);
 			}
 			return res;
-		}).then(function(res) {
+		}).then(function (res) {
 			var logContent = res.stdout || '';
 			if (!logContent) return [];
 			var lines = logContent.trim().split('\n');
-			
+
 			// 如果点击过清理，只显示之后的日志
 			if (lastClearTime) {
-				lines = lines.filter(function(line) {
+				lines = lines.filter(function (line) {
 					var match = line.match(/(\w{3}\s+\w{3}\s+\d+\s+\d+:\d+:\d+\s+\d{4})/);
 					if (match) {
 						var logTime = new Date(match[1]);
@@ -123,39 +123,39 @@ return view.extend({
 					}
 					return false;
 				});
-				
+
 				// 在过滤后的日志开头添加高亮的清理标记
 				var clearMarker = '=== 日志已清理 (' + lastClearTime.toLocaleString() + ') ===';
 				lines.unshift(clearMarker);
 			}
-			
+
 			return lines.slice(-150).map(self.cleanText).reverse();
 		});
 	},
-			
+
 	/**
 	 * v2.8: 计算二进制文件的MD5值
 	 */
-	getMD5: function() {
+	getMD5: function () {
 		return fs.exec('/bin/sh', ['-c', 'md5sum /usr/bin/udp2raw 2>/dev/null || echo "NOTFOUND"'])
-			.then(function(res) {
+			.then(function (res) {
 				var output = (res.stdout || '').trim();
-				
+
 				if (output.indexOf('NOTFOUND') === 0) {
 					throw new Error('Binary not found');
 				}
-				
+
 				// md5sum 输出格式: "0aa0c2776a4adf96... /usr/bin/udp2raw"
 				var match = output.match(/^([a-f0-9]{32})/i);
 				if (match && match[1]) {
-					return { 
-						installed: true, 
+					return {
+						installed: true,
 						md5: match[1].substring(0, 10)  // 取前10位
 					};
 				}
 				throw new Error('MD5 parse failed');
 			})
-			.catch(function(err) {
+			.catch(function (err) {
 				// 文件不存在或无法计算MD5
 				return { installed: false, md5: null };
 			});
@@ -164,19 +164,19 @@ return view.extend({
 	/**
 	 * v2.7: 检查 iptables (显示实际 Chain 名称)
 	 */
-	checkIptables: function() {
-		return fs.exec('/usr/sbin/iptables-save').then(function(res) {
+	checkIptables: function () {
+		return fs.exec('/usr/sbin/iptables-save').then(function (res) {
 			var rawOutput = res.stdout || '';
 			var statusText = _('No rules detected');
 			var statusColor = '#f0ad4e';
 			var present = false;
 
 			var chainMatches = rawOutput.match(/:udp2raw[^\s]*/g);
-			
+
 			if (chainMatches && chainMatches.length > 0) {
 				present = true;
 				statusColor = '#5cb85c';
-				var chainNames = chainMatches.map(function(s) { return s.substring(1); });
+				var chainNames = chainMatches.map(function (s) { return s.substring(1); });
 				statusText = _('Active: ') + chainNames.join(', ');
 			} else if (rawOutput.indexOf('udp2raw') !== -1) {
 				present = true;
@@ -189,12 +189,12 @@ return view.extend({
 			}
 
 			return { present: present, text: statusText, color: statusColor };
-		}).catch(function() { 
-			return { present: false, text: _('Check failed'), color: '#d9534f' }; 
+		}).catch(function () {
+			return { present: false, text: _('Check failed'), color: '#d9534f' };
 		});
 	},
 
-	fetchStatusData: function() {
+	fetchStatusData: function () {
 		return Promise.all([
 			this.getServiceStatus(),
 			this.getTunnelConfigs(),
@@ -203,21 +203,21 @@ return view.extend({
 		]);
 	},
 
-	load: function() {
+	load: function () {
 		return Promise.all([
 			this.fetchStatusData(),
 			this.getRecentLogs()
 		]);
 	},
 
-	render: function(data) {
+	render: function (data) {
 		var self = this;
 		var statusData = data[0];
 		var initialLogs = data[1];
-		
+
 		var view = E('div', { 'class': 'cbi-map' }, [
-			E('h2', {}, _('UDP Tunnel Status')),
-			
+			E('h2', {}, _('udp2raw Status')),
+
 			E('div', { 'class': 'cbi-section' }, [
 				E('div', { 'style': 'display: flex; align-items: center; padding: 10px 0;' }, [
 					E('div', { 'style': 'width: 200px; font-weight: bold;' }, _('Service Status:')),
@@ -261,12 +261,12 @@ return view.extend({
 					'readonly': 'readonly',
 					'wrap': 'off',
 					'id': 'syslog-textarea'
-				}),				
+				}),
 				E('div', { 'style': 'margin-top: 5px; text-align: right;' }, [
-					E('button', { 
-						'class': 'cbi-button cbi-button-negative', 
+					E('button', {
+						'class': 'cbi-button cbi-button-negative',
 						'id': 'log-stop-btn',
-						'click': function() { 
+						'click': function () {
 							if (self.logPollFn) {
 								poll.remove(self.logPollFn);
 								self.logPollFn = null;
@@ -276,13 +276,13 @@ return view.extend({
 						}
 					}, _('Stop Refresh')),
 					' ',
-					E('button', { 
-						'class': 'cbi-button cbi-button-positive', 
+					E('button', {
+						'class': 'cbi-button cbi-button-positive',
 						'id': 'log-start-btn',
-						'click': function() { 
+						'click': function () {
 							if (!self.logPollFn) {
-								self.logPollFn = poll.add(function() {
-									return self.getRecentLogs().then(function(logs) {
+								self.logPollFn = poll.add(function () {
+									return self.getRecentLogs().then(function (logs) {
 										self.updateLogView(view, logs);
 									});
 								}, 10);
@@ -290,36 +290,36 @@ return view.extend({
 						}
 					}, _('Start Refresh')),
 					' ',
-					E('button', { 
-						'class': 'cbi-button cbi-button-reset', 
-						'click': function() {
+					E('button', {
+						'class': 'cbi-button cbi-button-reset',
+						'click': function () {
 							lastClearTime = new Date();
 							// 立即刷新日志以显示清理标记
-							self.getRecentLogs().then(function(logs) {
+							self.getRecentLogs().then(function (logs) {
 								self.updateLogView(view, logs);
 							});
 						}
 					}, _('Clear Logs')),
 					' ',
-					E('button', { 
-						'class': 'cbi-button cbi-button-apply', 
-						'click': function() {
+					E('button', {
+						'class': 'cbi-button cbi-button-apply',
+						'click': function () {
 							var ta = document.getElementById('syslog-textarea');
 							if (ta && ta.value) {
 								var blob = new Blob([ta.value], { type: 'text/plain' });
 								var url = URL.createObjectURL(blob);
 								var a = document.createElement('a');
 								a.href = url;
-								a.download = 'udp2raw_log_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+								a.download = 'udp2raw_log_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
 								a.click();
 								URL.revokeObjectURL(url);
 							}
 						}
 					}, _('Download Logs')),
 					' ',
-					E('button', { 
-						'class': 'cbi-button cbi-button-neutral', 
-						'click': function() {
+					E('button', {
+						'class': 'cbi-button cbi-button-neutral',
+						'click': function () {
 							var ta = document.getElementById('syslog-textarea');
 							if (ta) ta.scrollTop = 0;  // ✅ 改为滚动到顶部
 						}
@@ -332,14 +332,14 @@ return view.extend({
 		this.updateLogView(view, initialLogs);
 
 		// 默认启动日志自动刷新
-		this.logPollFn = poll.add(function() {
-			return self.getRecentLogs().then(function(logs) {
+		this.logPollFn = poll.add(function () {
+			return self.getRecentLogs().then(function (logs) {
 				self.updateLogView(view, logs);
 			});
 		}, 10);
 
-		poll.add(function() {
-			return self.fetchStatusData().then(function(newData) {
+		poll.add(function () {
+			return self.fetchStatusData().then(function (newData) {
 				self.updateStatusView(view, newData);
 			});
 		}, this.pollInterval);
@@ -347,25 +347,25 @@ return view.extend({
 		return view;
 	},
 
-	refreshLogs: function(view) {
+	refreshLogs: function (view) {
 		var self = this;
 		var logStatus = view.querySelector('#log-status');
 		if (logStatus) logStatus.textContent = _('Refreshing...');
-		
-		this.getRecentLogs().then(function(logs) {
+
+		this.getRecentLogs().then(function (logs) {
 			self.updateLogView(view, logs);
 		});
 	},
 
-	updateLogView: function(view, logs) {
+	updateLogView: function (view, logs) {
 		var logTa = view.querySelector('#syslog-textarea');
 		var logStatus = view.querySelector('#log-status');
-		
+
 		if (logTa) {
 			var newText = '';
 			if (logs.length > 0) {
 				// 检查是否有清理标记，如果有则高亮显示
-				var processedLogs = logs.map(function(line) {
+				var processedLogs = logs.map(function (line) {
 					if (line.indexOf('=== 日志已清理') === 0) {
 						return '\x1b[33m' + line + '\x1b[0m'; // 黄色高亮
 					}
@@ -378,7 +378,7 @@ return view.extend({
 			logTa.value = newText;
 			logTa.scrollTop = 0;  // 滚动到顶部（最新日志）
 		}
-	
+
 		if (logStatus) {
 			var d = new Date();
 			logStatus.textContent = _('Last updated: ') + d.toLocaleTimeString();
@@ -386,7 +386,7 @@ return view.extend({
 		}
 	},
 
-	updateStatusView: function(view, data) {
+	updateStatusView: function (view, data) {
 		var status = data[0];
 		var tunnels = data[1];
 		var md5Info = data[2];      // v2.8: 改为md5Info
@@ -418,10 +418,10 @@ return view.extend({
 				cell.style.padding = '20px';
 				cell.innerHTML = '<em>' + _('No tunnels configured.') + '</em>';
 			} else {
-				tunnels.forEach(function(t) {
+				tunnels.forEach(function (t) {
 					var instance = status.instances[t.id] || status.instances[t.alias];
 					var isRunning = !!instance;
-					
+
 					var rowColor = '#d9534f';
 					var statusLabel = _('Stopped');
 					if (t.disabled) {
@@ -434,8 +434,8 @@ return view.extend({
 
 					var row = table.insertRow(-1);
 					row.className = 'tr';
-					
-					var addCell = function(text, color) {
+
+					var addCell = function (text, color) {
 						var c = row.insertCell(-1);
 						c.className = 'td';
 						if (color) c.style.color = color;
@@ -447,12 +447,12 @@ return view.extend({
 					addCell(t.alias);
 					addCell(t.mode === 'server' ? _('Server') : _('Client'));
 					addCell(statusLabel, rowColor);
-					
-					var cLocal = row.insertCell(-1); 
+
+					var cLocal = row.insertCell(-1);
 					cLocal.className = 'td';
 					cLocal.textContent = t.local;
-					
-					var cRemote = row.insertCell(-1); 
+
+					var cRemote = row.insertCell(-1);
 					cRemote.className = 'td';
 					cRemote.textContent = t.remote;
 
@@ -474,8 +474,8 @@ return view.extend({
 
 		var diagIp = view.querySelector('#diag-iptables');
 		if (diagIp) {
-			diagIp.innerHTML = '<span style="color:' + iptablesInfo.color + '">' + 
-			                   (iptablesInfo.present ? '✓ ' : '⚠ ') + iptablesInfo.text + '</span>';
+			diagIp.innerHTML = '<span style="color:' + iptablesInfo.color + '">' +
+				(iptablesInfo.present ? '✓ ' : '⚠ ') + iptablesInfo.text + '</span>';
 		}
 	},
 
