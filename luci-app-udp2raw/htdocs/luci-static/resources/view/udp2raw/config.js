@@ -1,7 +1,7 @@
 /**
  * Copyright (C) 2024 iHub-2020
  * 
- * LuCI UDP Tunnel Manager - Configuration Page
+ * luci-app-udp2raw - Configuration Page
  * Complete configuration interface with validation and safety checks
  * 
  * Features:
@@ -11,7 +11,7 @@
  * - Automatic iptables rule management for OpenWrt
  * - Integrated service control with reset functionality
  * 
- * @module luci-app-udp-tunnel/config
+ * @module luci-app-udp2raw/config
  * @version 2.1.0
  * @date 2026-01-30
  */

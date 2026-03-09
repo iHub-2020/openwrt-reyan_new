@@ -1,10 +1,10 @@
 /**
  * Copyright (C) 2024 iHub-2020
  * 
- * LuCI UDP Tunnel Manager - Status Page
+ * luci-app-udp2raw - Status Page
  * Displays real-time tunnel status, connection info, and diagnostics
  * 
- * @module luci-app-udp-tunnel/status
+ * @module luci-app-udp2raw/status
  * @version 2.9.0
  * @date 2026-01-30
  */

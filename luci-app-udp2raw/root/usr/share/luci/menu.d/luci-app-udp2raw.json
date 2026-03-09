@@ -7,7 +7,7 @@
 		},
 		"depends": {
 			"acl": [
-				"luci-app-udp-tunnel"
+				"luci-app-udp2raw"
 			],
 			"uci": {
 				"udp2raw": true

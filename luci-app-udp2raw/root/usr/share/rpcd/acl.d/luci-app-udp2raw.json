@@ -1,5 +1,5 @@
 {
-	"luci-app-udp-tunnel": {
+	"luci-app-udp2raw": {
 		"description": "Grant access to udp2raw configuration",
 		"read": {
 			"uci": [ "udp2raw" ],

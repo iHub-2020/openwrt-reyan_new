@@ -3,13 +3,13 @@
 #
 # This is free software, licensed under the MIT License.
 #
-# Project: LuCI Support for UDP Tunnel Manager
+# Project: LuCI Support for udp2raw
 # Version: 2.1.0
 #
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=luci-app-udp-tunnel
+PKG_NAME:=luci-app-udp2raw
 PKG_VERSION:=2.1.0
 PKG_RELEASE:=1
 
@@ -24,13 +24,13 @@ LUCI_PKGARCH:=all
 LUCI_DEPENDS:=+udp2raw +luci-base
 
 # 这一段描述是标准的 OpenWrt 包描述格式
-define Package/luci-app-udp-tunnel/description
+define Package/luci-app-udp2raw/description
   udp2raw Raw Socket Tunnel - Web interface for configuring udp2raw tunnels
   with FakeTCP/UDP/ICMP modes.
 endef
 
-# 核心：引入 luci.mk，它会自动处理 po/zh_Hans/luci-app-udp-tunnel.po
+# 核心：引入 luci.mk，它会自动处理 po/zh_Hans/luci-app-udp2raw.po
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # 最后一行调用构建逻辑
-$(eval $(call BuildPackage,luci-app-udp-tunnel))
+$(eval $(call BuildPackage,luci-app-udp2raw))

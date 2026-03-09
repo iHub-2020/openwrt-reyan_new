@@ -1,4 +1,4 @@
-# Changelog - LuCI UDP Tunnel Manager
+# Changelog - luci-app-udp2raw
 
 All notable changes to this project will be documented in this file.
 
